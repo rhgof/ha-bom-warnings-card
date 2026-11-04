@@ -6,7 +6,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "build": "esbuild src/bom-warnings-card.ts --bundle --format=esm --minify --target=es2022 --outfile=dist/bom-warnings-card.js",
+    "build": "esbuild src/index.ts --bundle --format=esm --minify --target=es2022 --outfile=dist/bom-warnings-card.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

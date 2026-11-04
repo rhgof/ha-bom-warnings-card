@@ -1,8 +1,11 @@
 # BoM Warnings Card
 
-A Lovelace card for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration. It
-lists the Bureau of Meteorology warnings for a location, most severe first, each with an icon in
-the colour of its severity.
+Two Lovelace cards for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration:
+
+- **BoM Warnings** (`custom:bom-warnings-card`) lists the Bureau of Meteorology warnings for a
+  location, most severe first, each with an icon in the colour of its severity.
+- **BoM Warning Tile** (`custom:bom-warning-tile`) is one warning type as a tile, with its icon in
+  the colour of the current severity. See [Warning tile](#warning-tile).
 
 | Light | Dark |
 | --- | --- |
@@ -50,6 +53,38 @@ The order is the integration's own ranking. The card does not re-sort.
 If you would rather not install a card, the integration's
 [dashboard guide](https://github.com/rhgof/ha-bom-warnings/blob/main/docs/dashboard.md) has a
 ready-made section built from Home Assistant's own cards.
+
+## Warning tile
+
+One warning type (thunderstorm, flood, marine wind and so on) as a tile, with the icon in the colour
+of the sensor's current severity. A type with no warning keeps the tile's usual colour.
+
+| Light | Dark |
+| --- | --- |
+| ![Warning tiles, light theme](docs/images/warning-tile-light.png) | ![Warning tiles, dark theme](docs/images/warning-tile-dark.png) |
+
+Edit a dashboard, choose **Add card**, open the **By card** tab and pick **BoM Warning Tile**, or:
+
+```yaml
+type: custom:bom-warning-tile
+entity: sensor.home_thunderstorm_warning
+```
+
+`entity` is one of the integration's per-type warning sensors (`sensor.<title>_<type>_warning`). The
+integration must be recent enough for those sensors to have a `color` attribute.
+
+The card is Home Assistant's own tile with its colour set from the sensor, so everything a tile has
+is there: tapping opens the sensor's history and activity, and the editor has the tile's own name,
+icon, state content (add the headline, summary or area), layout, interactions and features.
+
+- **Colour.** While a warning is active its severity colour is used, even if the tile's **Colour**
+  option is set. With no warning, that option (or the tile's default) applies.
+- **Hide when there is no warning.** Use the editor's **Visibility** tab and show the card only when
+  the state is not `none`. The card has no options of its own, because the tile's editor rejects
+  settings it does not know.
+- **Home Assistant versions.** It relies on two internals of the frontend, `loadCardHelpers()` and
+  the tile card's editor. It was checked on Home Assistant 2026.10.4 only, so check it after an
+  upgrade.
 
 ## Develop
 
