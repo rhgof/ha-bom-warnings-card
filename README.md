@@ -14,13 +14,25 @@ integration's options) is dimmed and says so. With no warnings the card says so.
 
 ## Install
 
+You need the [BoM Warnings integration](https://github.com/rhgof/ha-bom-warnings) set up first:
+the card reads its warning count sensor.
+
 1. In HACS, open the menu, choose **Custom repositories**, add
    `https://github.com/rhgof/ha-bom-warnings-card` with the category **Dashboard**.
-2. Download **BoM Warnings Card**, then reload the browser.
+2. Download **BoM Warnings Card**, then hard-refresh the browser. The card's file is cached for a
+   long time, so a page opened before an update keeps the old card until you do.
+
+To update later, open the card in HACS, choose **Update information** from its menu, then
+**Update**.
 
 ## Use
 
-Add a card of type `custom:bom-warnings-card`, or pick **BoM Warnings** from the card picker:
+Edit a dashboard, choose **Add card**, open the **By card** tab and pick **BoM Warnings**. The
+editor starts with one of your warning count sensors already chosen.
+
+![The card's editor in Home Assistant](docs/images/editor.png)
+
+Or write it in YAML:
 
 ```yaml
 type: custom:bom-warnings-card
@@ -34,6 +46,10 @@ entity: sensor.home_warning_count
 | `show_summary` | `true` | Set to `false` to leave out each warning's summary. |
 
 The order is the integration's own ranking. The card does not re-sort.
+
+If you would rather not install a card, the integration's
+[dashboard guide](https://github.com/rhgof/ha-bom-warnings/blob/main/docs/dashboard.md) has a
+ready-made section built from Home Assistant's own cards.
 
 ## Develop
 

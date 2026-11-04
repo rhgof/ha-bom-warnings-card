@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
+import "./bom-warnings-card-editor";
 
 // The shape of a `warnings` item on the integration's count sensor. The integration's tests check
 // the shared fixture against what it really produces, so these names cannot drift unnoticed.
@@ -47,6 +48,10 @@ export class BomWarningsCard extends LitElement {
 
   hass?: Hass;
   _config?: Config;
+
+  static getConfigElement(): HTMLElement {
+    return document.createElement("bom-warnings-card-editor");
+  }
 
   static getStubConfig(hass?: Hass): Partial<Config> {
     const count = Object.keys(hass?.states ?? {}).find((id) => id.endsWith("_warning_count"));
