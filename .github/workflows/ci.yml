@@ -28,3 +28,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: plugin
+          # Only the HACS default store wants a README image. Add a screenshot with the ranked
+          # list, then drop this.
+          ignore: images
