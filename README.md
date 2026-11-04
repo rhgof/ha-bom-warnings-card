@@ -1,10 +1,16 @@
 # BoM Warnings Card
 
-A Lovelace card for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration, which
-shows Bureau of Meteorology warnings for a location.
+A Lovelace card for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration. It
+lists the Bureau of Meteorology warnings for a location, most severe first, each with an icon in
+the colour of its severity.
 
-**Status: early.** This version only shows one sensor's state, to prove the install path. The
-ranked warning list, with a coloured icon per severity, comes next.
+| Light | Dark |
+| --- | --- |
+| ![Ranked warning list, light theme](docs/images/ranked-list-light.png) | ![Ranked warning list, dark theme](docs/images/ranked-list-dark.png) |
+
+Each warning shows its event, level, headline, the names of your location's areas it covers, and a
+short summary. A warning that has ended (`final` or `cancelled`, if you keep those in the
+integration's options) is dimmed and says so. With no warnings the card says so.
 
 ## Install
 
@@ -21,8 +27,13 @@ type: custom:bom-warnings-card
 entity: sensor.home_warning_count
 ```
 
-`entity` is the integration's warning count sensor. For an entry titled `Home` it is
-`sensor.home_warning_count`.
+| Option | Default | |
+| --- | --- | --- |
+| `entity` | required | The integration's warning count sensor. For an entry titled `Home` it is `sensor.home_warning_count`. |
+| `title` | `Warnings` | The card's header. |
+| `show_summary` | `true` | Set to `false` to leave out each warning's summary. |
+
+The order is the integration's own ranking. The card does not re-sort.
 
 ## Develop
 
@@ -34,4 +45,5 @@ npm run build   # writes dist/bom-warnings-card.js, which HACS serves, so commit
 
 `tests/fixtures/states.json` is a copy of the integration's
 `tests/fixtures/dashboard/states.json`, the shared description of the attributes the card reads.
-Copy it again when the integration's attributes change.
+The integration's own tests check that file against what it really produces, and this repo's CI
+fails if the copy falls behind. Copy it again when the integration's attributes change.

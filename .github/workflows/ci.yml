@@ -14,6 +14,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The card reads what the integration produces, so a fixture that has fallen behind its
+      # source means the tests below no longer describe the real attributes.
+      - name: fixture matches the integration's
+        run: >-
+          curl -fsSL https://raw.githubusercontent.com/rhgof/ha-bom-warnings/main/tests/fixtures/dashboard/states.json
+          | diff - tests/fixtures/states.json
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -28,6 +34,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: plugin
-          # Only the HACS default store wants a README image. Add a screenshot with the ranked
-          # list, then drop this.
-          ignore: images
