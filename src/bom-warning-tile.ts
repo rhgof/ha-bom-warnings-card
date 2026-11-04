@@ -37,6 +37,9 @@ declare global {
   }
 }
 
+// A sensor's state is its level. `none` and anything else (unavailable, unknown) rank lowest.
+const LEVEL_RANK: Record<string, number> = { extreme: 4, severe: 3, moderate: 2, unrated: 2, minor: 1 };
+
 // The tile's own default size, used until the tile exists to say.
 const DEFAULT_GRID = { columns: 6, rows: 1 };
 
@@ -67,8 +70,11 @@ export class BomWarningTile extends LitElement {
     return tile.getConfigElement();
   }
 
+  // A new card starts on the most severe sensor that has a warning, so there is something to see,
+  // and on the first sensor when none has. Home Assistant lists entities in no useful order, so
+  // "first" alone would start every card on the same, arbitrary location.
   static getStubConfig(hass?: Hass): Partial<Config> {
-    const sensor = Object.entries(hass?.states ?? {}).find(
+    const sensors = Object.entries(hass?.states ?? {}).filter(
       ([id, state]) =>
         id.startsWith("sensor.") &&
         id.endsWith("_warning") &&
@@ -76,7 +82,9 @@ export class BomWarningTile extends LitElement {
         state?.attributes.level !== undefined &&
         Array.isArray(state.attributes.warnings),
     );
-    return { entity: sensor?.[0] ?? "" };
+    const rank = (state?: HassState) => LEVEL_RANK[state?.state ?? ""] ?? 0;
+    const [best] = [...sensors].sort(([, a], [, b]) => rank(b) - rank(a));
+    return { entity: best?.[0] ?? "" };
   }
 
   setConfig(config: Config): void {

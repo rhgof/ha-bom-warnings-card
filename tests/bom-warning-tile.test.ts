@@ -203,6 +203,58 @@ describe("how the card behaves on a dashboard", () => {
     expect(cls.getStubConfig({ states: {} }).entity).toBe("");
   });
 
+  describe("choosing the sensor a new card starts on", () => {
+    const sensor = (state: string) => ({ state, attributes: { level: state, warnings: [] } });
+    const stub = (states: Record<string, unknown>) =>
+      (customElements.get("bom-warning-tile") as unknown as CardClass).getStubConfig({ states }).entity;
+
+    it("prefers a sensor with a warning over one listed first that has none", () => {
+      expect(
+        stub({
+          "sensor.cairns_thunderstorm_warning": sensor("none"),
+          "sensor.home_marine_wind_warning": sensor("moderate"),
+        }),
+      ).toBe("sensor.home_marine_wind_warning");
+    });
+
+    it("prefers the most severe of the sensors that have a warning", () => {
+      expect(
+        stub({
+          "sensor.a_wind_warning": sensor("minor"),
+          "sensor.b_flood_warning": sensor("extreme"),
+          "sensor.c_frost_warning": sensor("moderate"),
+        }),
+      ).toBe("sensor.b_flood_warning");
+    });
+
+    it("falls back to the first sensor when none has a warning", () => {
+      expect(
+        stub({
+          "sensor.cairns_thunderstorm_warning": sensor("none"),
+          "sensor.home_marine_wind_warning": sensor("none"),
+        }),
+      ).toBe("sensor.cairns_thunderstorm_warning");
+    });
+
+    it("does not count an unavailable sensor as having a warning", () => {
+      expect(
+        stub({
+          "sensor.a_wind_warning": sensor("none"),
+          "sensor.b_flood_warning": sensor("unavailable"),
+        }),
+      ).toBe("sensor.a_wind_warning");
+    });
+
+    it("counts an unrated warning as one", () => {
+      expect(
+        stub({
+          "sensor.a_wind_warning": sensor("none"),
+          "sensor.b_thunderstorm_warning": sensor("unrated"),
+        }),
+      ).toBe("sensor.b_thunderstorm_warning");
+    });
+  });
+
   it("is listed in the card picker", () => {
     const cards = (window as unknown as { customCards: { type: string }[] }).customCards;
 

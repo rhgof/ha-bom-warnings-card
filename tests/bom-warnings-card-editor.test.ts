@@ -124,4 +124,47 @@ describe("the stub config a new card starts from", () => {
 
     expect(card.getStubConfig({ states: {} }).entity).toBe("");
   });
+
+  it("prefers a location that has a warning over one listed first that has none", () => {
+    const card = customElements.get("bom-warnings-card") as unknown as CardClass;
+    const states = {
+      "sensor.cairns_warning_count": { state: "0", attributes: {} },
+      "sensor.home_warning_count": { state: "3", attributes: {} },
+    };
+
+    expect(card.getStubConfig({ states }).entity).toBe("sensor.home_warning_count");
+  });
+
+  it("prefers the location with the most warnings among those that have one", () => {
+    const card = customElements.get("bom-warnings-card") as unknown as CardClass;
+    const states = {
+      "sensor.cairns_warning_count": { state: "1", attributes: {} },
+      "sensor.warwick_warning_count": { state: "0", attributes: {} },
+      "sensor.home_warning_count": { state: "3", attributes: {} },
+      "sensor.other_warning_count": { state: "3", attributes: {} },
+    };
+
+    // A tie goes to the one listed first.
+    expect(card.getStubConfig({ states }).entity).toBe("sensor.home_warning_count");
+  });
+
+  it("falls back to the first when no location has a warning", () => {
+    const card = customElements.get("bom-warnings-card") as unknown as CardClass;
+    const states = {
+      "sensor.cairns_warning_count": { state: "0", attributes: {} },
+      "sensor.home_warning_count": { state: "0", attributes: {} },
+    };
+
+    expect(card.getStubConfig({ states }).entity).toBe("sensor.cairns_warning_count");
+  });
+
+  it("does not count an unavailable sensor as having a warning", () => {
+    const card = customElements.get("bom-warnings-card") as unknown as CardClass;
+    const states = {
+      "sensor.cairns_warning_count": { state: "0", attributes: {} },
+      "sensor.home_warning_count": { state: "unavailable", attributes: {} },
+    };
+
+    expect(card.getStubConfig({ states }).entity).toBe("sensor.cairns_warning_count");
+  });
 });

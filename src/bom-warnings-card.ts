@@ -54,8 +54,16 @@ export class BomWarningsCard extends LitElement {
   }
 
   static getStubConfig(hass?: Hass): Partial<Config> {
-    const count = Object.keys(hass?.states ?? {}).find((id) => id.endsWith("_warning_count"));
-    return { entity: count ?? "" };
+    // The location with the most warnings, so a new card has something to show, else the first
+    // one: the order Home Assistant lists entities in means nothing, so "first" alone is
+    // arbitrary. A tie goes to the one listed first.
+    const counts = Object.keys(hass?.states ?? {}).filter((id) => id.endsWith("_warning_count"));
+    const warnings = (id: string) => Number(hass?.states[id]?.state) || 0;
+    const most = counts.reduce<string | undefined>(
+      (best, id) => (warnings(id) > (best ? warnings(best) : 0) ? id : best),
+      undefined,
+    );
+    return { entity: most ?? counts[0] ?? "" };
   }
 
   setConfig(config: Config): void {
