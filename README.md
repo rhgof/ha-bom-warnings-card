@@ -31,8 +31,8 @@ which brings Bureau of Meteorology warnings into Home Assistant:
   one for yours.
 - **Choose what each row shows.** The headline, the areas, the summary, and the level and phase can
   each be switched off.
-- **Tap for the history.** Tapping the card opens the sensor's history and activity, like the
-  built-in cards. Hold and double tap can do something else.
+- **Tap for detail.** Tapping the card shows or hides every warning's summary, so the list stays
+  short until you want the detail.
 - **Ended warnings are dimmed.** A warning that has gone `final` or `cancelled` (if you keep those in
   the integration's options) says so instead of looking current. With no warnings the card says so.
 - **A tile for each warning type**, for a compact row of thunderstorm, flood, fire weather and so on.
@@ -76,33 +76,21 @@ entity: sensor.home_warning_count
 | `title` | `Warnings` | The card's header. |
 | `show_headline` | `true` | Set to `false` to leave out each warning's headline. |
 | `show_area` | `true` | Set to `false` to leave out the names of the areas each warning covers. |
-| `show_summary` | `true` | Set to `false` to leave out each warning's summary. Cards made before the other `show_` options keep working. |
+| `show_summary` | `true` | Whether the summaries are showing when the card loads. Set to `false` to start with them hidden. |
 | `show_level` | `true` | Set to `false` to leave out each warning's level and phase, for example `(moderate, final)`. An ended warning is still dimmed. |
-| `tap_action` | `more-info` | What a tap does. |
-| `hold_action` | `none` | What pressing and holding for half a second does. |
-| `double_tap_action` | `none` | What tapping twice does. |
 
 The event name and icon always show. Each option is in the card's editor too, so none of them needs
 YAML.
 
-### Tap, hold and double tap
+### Tapping the card
 
-A tap opens the more-info dialog of the warning count sensor, with its history, activity and
-settings. The three actions are Home Assistant's own, so the editor offers the usual choices:
-more-info, navigate, call a service, open a URL or do nothing. For example, to jump to a weather
-page on a hold:
+A tap shows or hides the summary under every warning. `show_summary` only sets where it starts: a
+reload goes back to that, and each card keeps its own state. The card is a button for the keyboard
+and screen readers (Enter or Space toggles it) only while at least one warning has a summary. With
+no warnings, an unavailable sensor, or no summaries to show, a tap does nothing.
 
-```yaml
-type: custom:bom-warnings-card
-entity: sensor.home_warning_count
-hold_action:
-  action: navigate
-  navigation_path: /lovelace/weather
-```
-
-Setting a double tap action makes a single tap wait a quarter of a second, to see whether a second
-tap follows. Leave it unset and a tap acts at once. With the tap action set to `none` the card
-is not a button, so it does not take keyboard focus.
+Before this, `show_summary: false` meant the summaries never showed. Now a tap shows them, so a card
+set that way is no longer limited to the short view.
 
 If you would rather not install a card, the integration's
 [dashboard guide](https://github.com/rhgof/ha-bom-warnings/blob/main/docs/dashboard.md) has a

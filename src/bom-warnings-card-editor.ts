@@ -4,11 +4,6 @@ interface Hass {
   states: Record<string, unknown>;
 }
 
-interface ActionConfig {
-  action: string;
-  [key: string]: unknown;
-}
-
 interface Config {
   type: string;
   entity?: string;
@@ -17,9 +12,6 @@ interface Config {
   show_area?: boolean;
   show_summary?: boolean;
   show_level?: boolean;
-  tap_action?: ActionConfig;
-  hold_action?: ActionConfig;
-  double_tap_action?: ActionConfig;
 }
 
 const LABELS: Record<string, string> = {
@@ -27,27 +19,18 @@ const LABELS: Record<string, string> = {
   title: "Title",
   show_headline: "Show each warning's headline",
   show_area: "Show the areas each warning covers",
-  show_summary: "Show each warning's summary",
+  show_summary: "Show each warning's summary to start with",
   show_level: "Show each warning's level and phase",
-  tap_action: "Tap action",
-  hold_action: "Hold action",
-  double_tap_action: "Double tap action",
 };
 
 const HELPERS: Record<string, string> = {
   entity: "The sensor named ... warning count from the BoM Warnings integration.",
   title: "Leave empty for the default, Warnings.",
+  show_summary: "Tapping the card shows or hides the summaries.",
 };
 
 // Each of these shows a part of every row, and is on unless the person switches it off.
 const SHOW = ["show_headline", "show_area", "show_summary", "show_level"] as const;
-
-// What each action does when none is set. Only a choice that differs is saved.
-const ACTIONS = {
-  tap_action: "more-info",
-  hold_action: "none",
-  double_tap_action: "none",
-} as const;
 
 export class BomWarningsCardEditor extends LitElement {
   static properties = {
@@ -70,10 +53,6 @@ export class BomWarningsCardEditor extends LitElement {
       { name: "entity", required: true, selector: { entity: { include_entities: counts } } },
       { name: "title", selector: { text: {} } },
       ...SHOW.map((name) => ({ name, selector: { boolean: {} } })),
-      ...Object.entries(ACTIONS).map(([name, defaultAction]) => ({
-        name,
-        selector: { ui_action: { default_action: defaultAction } },
-      })),
     ];
   }
 
@@ -94,13 +73,6 @@ export class BomWarningsCardEditor extends LitElement {
         config[name] = false;
       }
     }
-    for (const [name, defaultAction] of Object.entries(ACTIONS) as [keyof typeof ACTIONS, string][]) {
-      const chosen = value[name];
-      const plainDefault = chosen?.action === defaultAction && Object.keys(chosen).length === 1;
-      if (chosen && !plainDefault) {
-        config[name] = chosen;
-      }
-    }
     this._config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
   }
@@ -114,9 +86,6 @@ export class BomWarningsCardEditor extends LitElement {
       show_area: true,
       show_summary: true,
       show_level: true,
-      tap_action: { action: "more-info" },
-      hold_action: { action: "none" },
-      double_tap_action: { action: "none" },
       ...this._config,
     };
     return html`<ha-form

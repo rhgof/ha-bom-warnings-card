@@ -58,7 +58,7 @@ describe("the card's editor", () => {
     expect(card.getConfigElement().tagName.toLowerCase()).toBe("bom-warnings-card-editor");
   });
 
-  it("offers the entity, the title, what each row shows and the three actions", async () => {
+  it("offers the entity, the title and what each row shows", async () => {
     const schema = form(await mount()).schema;
 
     expect(schema.map((f) => f.name)).toEqual([
@@ -68,23 +68,18 @@ describe("the card's editor", () => {
       "show_area",
       "show_summary",
       "show_level",
-      "tap_action",
-      "hold_action",
-      "double_tap_action",
     ]);
     expect(schema[0].required).toBe(true);
     expect(Object.keys(schema[0].selector)).toEqual(["entity"]);
-    for (const field of schema.slice(2, 6)) {
+    for (const field of schema.slice(2)) {
       expect(Object.keys(field.selector), field.name).toEqual(["boolean"]);
     }
   });
 
-  it("offers Home Assistant's own action picker, opening more-info on a tap by default", async () => {
-    const [tap, hold, double] = form(await mount()).schema.slice(6);
+  it("says that the summary switch is where the card starts, since a tap toggles it", async () => {
+    const f = form(await mount());
 
-    expect(tap.selector).toEqual({ ui_action: { default_action: "more-info" } });
-    expect(hold.selector).toEqual({ ui_action: { default_action: "none" } });
-    expect(double.selector).toEqual({ ui_action: { default_action: "none" } });
+    expect(f.computeLabel({ name: "show_summary" }).toLowerCase()).toContain("start");
   });
 
   it("offers only the warning count sensors as the entity", async () => {
@@ -106,9 +101,6 @@ describe("the card's editor", () => {
       show_area: true,
       show_summary: true,
       show_level: true,
-      tap_action: { action: "more-info" },
-      hold_action: { action: "none" },
-      double_tap_action: { action: "none" },
     });
   });
 
@@ -160,49 +152,6 @@ describe("the card's editor", () => {
     },
   );
 
-  it("saves an action that is not the default, and leaves out one that is", async () => {
-    const editor = await mount({ entity: "sensor.home_warning_count" });
-    const navigate = { action: "navigate", navigation_path: "/history" };
-
-    const [chosen] = change(editor, {
-      entity: "sensor.home_warning_count",
-      tap_action: navigate,
-      hold_action: { action: "more-info" },
-      double_tap_action: { action: "toggle" },
-    });
-    const [defaults] = change(editor, {
-      entity: "sensor.home_warning_count",
-      tap_action: { action: "more-info" },
-      hold_action: { action: "none" },
-      double_tap_action: { action: "none" },
-    });
-
-    expect(chosen).toEqual({
-      type: "custom:bom-warnings-card",
-      entity: "sensor.home_warning_count",
-      tap_action: navigate,
-      hold_action: { action: "more-info" },
-      double_tap_action: { action: "toggle" },
-    });
-    expect(defaults).toEqual({ type: "custom:bom-warnings-card", entity: "sensor.home_warning_count" });
-  });
-
-  it("keeps the default action when it was given settings of its own", async () => {
-    const editor = await mount({ entity: "sensor.home_warning_count" });
-    const withEntity = { action: "more-info", entity: "sensor.cairns_warning_count" };
-
-    const [config] = change(editor, { entity: "sensor.home_warning_count", tap_action: withEntity });
-
-    expect(config.tap_action).toEqual(withEntity);
-  });
-
-  it("saves a tap action of none, since it differs from the more-info default", async () => {
-    const editor = await mount({ entity: "sensor.home_warning_count" });
-
-    const [config] = change(editor, { entity: "sensor.home_warning_count", tap_action: { action: "none" } });
-
-    expect(config.tap_action).toEqual({ action: "none" });
-  });
 });
 
 describe("the stub config a new card starts from", () => {

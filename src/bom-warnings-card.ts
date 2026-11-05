@@ -24,11 +24,6 @@ interface Hass {
   states: Record<string, HassState | undefined>;
 }
 
-interface ActionConfig {
-  action: string;
-  [key: string]: unknown;
-}
-
 interface Config {
   type: string;
   entity: string;
@@ -37,12 +32,7 @@ interface Config {
   show_area?: boolean;
   show_summary?: boolean;
   show_level?: boolean;
-  tap_action?: ActionConfig;
-  hold_action?: ActionConfig;
-  double_tap_action?: ActionConfig;
 }
-
-type Gesture = "tap" | "hold" | "double_tap";
 
 declare global {
   interface Window {
@@ -51,23 +41,20 @@ declare global {
 }
 
 const ENDED = ["final", "cancelled"];
-const NONE: ActionConfig = { action: "none" };
-// The same timings as Home Assistant's own cards.
-const HOLD_MS = 500;
-const DOUBLE_TAP_MS = 250;
 
 export class BomWarningsCard extends LitElement {
   // Declared this way, not with decorators, so the build needs no decorator settings.
   static properties = {
     hass: { attribute: false },
     _config: { state: true },
+    _summaries: { state: true },
   };
 
   hass?: Hass;
   _config?: Config;
-  _holdTimer?: ReturnType<typeof setTimeout>;
-  _tapTimer?: ReturnType<typeof setTimeout>;
-  _held = false;
+  // Whether the summaries are open right now. A tap flips it. It is not saved, so a reload goes
+  // back to what `show_summary` says.
+  _summaries = true;
 
   static getConfigElement(): HTMLElement {
     return document.createElement("bom-warnings-card-editor");
@@ -91,108 +78,44 @@ export class BomWarningsCard extends LitElement {
       throw new Error("Set an entity, such as sensor.home_warning_count");
     }
     this._config = config;
+    // A changed config, such as the editor's summary switch, wins over an earlier tap.
+    this._summaries = config.show_summary !== false;
   }
 
   getCardSize(): number {
     return 3;
   }
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    clearTimeout(this._holdTimer);
-    clearTimeout(this._tapTimer);
-    this._tapTimer = undefined;
+  // Only a card with a summary to open or close is a button, because a tap on any other would
+  // seem to do nothing.
+  _warnings(): Warning[] {
+    const entity = this._config && this.hass?.states[this._config.entity];
+    if (!entity || entity.state === "unavailable" || entity.state === "unknown") {
+      return [];
+    }
+    return (entity.attributes.warnings as Warning[] | undefined) ?? [];
   }
 
-  // What Home Assistant's action handler reads from a card: the entity and the three actions.
-  _actions() {
-    const config = this._config!;
-    return {
-      entity: config.entity,
-      tap_action: config.tap_action ?? { action: "more-info" },
-      hold_action: config.hold_action ?? NONE,
-      double_tap_action: config.double_tap_action ?? NONE,
-    };
-  }
-
-  _isOn(gesture: Gesture): boolean {
-    return this._actions()[`${gesture}_action`].action !== "none";
-  }
-
-  // Home Assistant listens for this above the card and carries the action out, as it does for its
-  // own cards, so navigation, more-info, calling a service and the rest all work.
-  _fire(gesture: Gesture): void {
-    if (!this._isOn(gesture)) {
-      return;
-    }
-    this.dispatchEvent(
-      new CustomEvent("hass-action", {
-        detail: { config: this._actions(), action: gesture },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
-
-  _down = (): void => {
-    this._held = false;
-    clearTimeout(this._holdTimer);
-    if (this._isOn("hold")) {
-      this._holdTimer = setTimeout(() => {
-        this._held = true;
-        this._fire("hold");
-      }, HOLD_MS);
-    }
-  };
-
-  _release = (): void => {
-    clearTimeout(this._holdTimer);
-  };
-
-  _click = (): void => {
-    if (this._held) {
-      // The press already did its work as a hold.
-      this._held = false;
-      return;
-    }
-    if (!this._isOn("double_tap")) {
-      this._fire("tap");
-      return;
-    }
-    if (this._tapTimer !== undefined) {
-      clearTimeout(this._tapTimer);
-      this._tapTimer = undefined;
-      this._fire("double_tap");
-      return;
-    }
-    // A second tap may be on its way, so a single tap waits to find out.
-    this._tapTimer = setTimeout(() => {
-      this._tapTimer = undefined;
-      this._fire("tap");
-    }, DOUBLE_TAP_MS);
+  _toggle = (): void => {
+    this._summaries = !this._summaries;
   };
 
   _key = (event: KeyboardEvent): void => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      this._fire("tap");
+      this._toggle();
     }
   };
 
-  // The keyboard and a screen reader only treat the card as a button while a tap does something.
-  _shell(header: string, body: unknown, interactive: boolean) {
-    const tappable = interactive && this._isOn("tap");
+  _shell(header: string, body: unknown, toggles: boolean) {
     return html`<ha-card
       header=${header}
-      class=${tappable ? "tappable" : ""}
-      role=${tappable ? "button" : nothing}
-      tabindex=${tappable ? "0" : nothing}
-      @click=${interactive ? this._click : nothing}
-      @pointerdown=${interactive ? this._down : nothing}
-      @pointerup=${interactive ? this._release : nothing}
-      @pointercancel=${interactive ? this._release : nothing}
-      @pointerleave=${interactive ? this._release : nothing}
-      @keydown=${tappable ? this._key : nothing}
+      class=${toggles ? "toggles" : ""}
+      role=${toggles ? "button" : nothing}
+      tabindex=${toggles ? "0" : nothing}
+      aria-expanded=${toggles ? String(this._summaries) : nothing}
+      @click=${toggles ? this._toggle : nothing}
+      @keydown=${toggles ? this._key : nothing}
       >${body}</ha-card
     >`;
   }
@@ -212,15 +135,15 @@ export class BomWarningsCard extends LitElement {
       );
     }
     if (entity.state === "unavailable" || entity.state === "unknown") {
-      return this._shell(header, html`<div class="note">${entity.state}</div>`, true);
+      return this._shell(header, html`<div class="note">${entity.state}</div>`, false);
     }
-    const warnings = (entity.attributes.warnings as Warning[] | undefined) ?? [];
+    const warnings = this._warnings();
     return this._shell(
       header,
       warnings.length === 0
         ? html`<div class="note">No warnings for this location.</div>`
         : html`<div class="list">${warnings.map((w) => this._row(w, config))}</div>`,
-      true,
+      warnings.some((w) => w.summary),
     );
   }
 
@@ -243,9 +166,7 @@ export class BomWarningsCard extends LitElement {
           ? html`<div class="headline">${w.headline}</div>`
           : nothing}
         ${config.show_area !== false && w.area ? html`<div class="area">${w.area}</div>` : nothing}
-        ${config.show_summary !== false && w.summary
-          ? html`<div class="summary">${w.summary}</div>`
-          : nothing}
+        ${this._summaries && w.summary ? html`<div class="summary">${w.summary}</div>` : nothing}
       </div>
     </div>`;
   }
@@ -257,10 +178,10 @@ export class BomWarningsCard extends LitElement {
       flex-direction: column;
       gap: 12px;
     }
-    ha-card.tappable {
+    ha-card.toggles {
       cursor: pointer;
     }
-    ha-card.tappable:focus-visible {
+    ha-card.toggles:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: -2px;
     }
