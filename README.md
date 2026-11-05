@@ -1,19 +1,44 @@
 # BoM Warnings Card
 
-Two Lovelace cards for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration:
+Two Lovelace cards for the [BoM Warnings](https://github.com/rhgof/ha-bom-warnings) integration,
+which brings Bureau of Meteorology warnings into Home Assistant:
 
-- **BoM Warnings** (`custom:bom-warnings-card`) lists the Bureau of Meteorology warnings for a
-  location, most severe first, each with an icon in the colour of its severity.
+- **BoM Warnings** (`custom:bom-warnings-card`) lists the warnings for a location, most severe
+  first, each with an icon in the colour of its severity.
 - **BoM Warning Tile** (`custom:bom-warning-tile`) is one warning type as a tile, with its icon in
-  the colour of the current severity. See [Warning tile](#warning-tile).
+  the colour of the current severity.
 
 | Light | Dark |
 | --- | --- |
 | ![Ranked warning list, light theme](docs/images/ranked-list-light.png) | ![Ranked warning list, dark theme](docs/images/ranked-list-dark.png) |
 
-Each warning shows its event, level, headline, the names of your location's areas it covers, and a
-short summary. A warning that has ended (`final` or `cancelled`, if you keep those in the
-integration's options) is dimmed and says so. With no warnings the card says so.
+## Contents
+
+- [Key features](#key-features)
+- [Install](#install)
+- [BoM Warnings card](#bom-warnings-card-1): the ranked list, its options and the editor
+- [Warning tile](#warning-tile): one warning type as a tile
+- [Development](#development)
+
+## Key features
+
+- **The worst warning first.** The list is in the integration's own order, so what matters most to
+  your location is at the top. The card does not re-sort.
+- **Severity you can read at a glance.** Each warning has an icon in the colour of its level, in
+  light and dark themes.
+- **Says which area a warning is for.** Each warning shows the names of your location's areas it
+  covers (for example `Illawarra`), so a warning for the next district over looks different from
+  one for yours.
+- **A short summary under each headline**, which you can turn off.
+- **Ended warnings are dimmed.** A warning that has gone `final` or `cancelled` (if you keep those in
+  the integration's options) says so instead of looking current. With no warnings the card says so.
+- **A tile for each warning type**, for a compact row of thunderstorm, flood, fire weather and so on.
+  It is Home Assistant's own tile, so tapping opens the sensor's history and you keep all of the
+  tile's options.
+- **Set up from the dashboard.** Pick the card from the card picker and choose a location. No YAML
+  or template is needed.
+- **Starts on a warning.** A new card chooses a sensor that has a warning, not whichever is listed
+  first.
 
 ## Install
 
@@ -28,7 +53,7 @@ the card reads its warning count sensor.
 To update later, open the card in HACS, choose **Update information** from its menu, then
 **Update**.
 
-## Use
+## BoM Warnings card
 
 Edit a dashboard, choose **Add card**, open the **By card** tab and pick **BoM Warnings**. The
 editor starts with one of your warning count sensors already chosen.
@@ -47,8 +72,6 @@ entity: sensor.home_warning_count
 | `entity` | required | The integration's warning count sensor. For an entry titled `Home` it is `sensor.home_warning_count`. |
 | `title` | `Warnings` | The card's header. |
 | `show_summary` | `true` | Set to `false` to leave out each warning's summary. |
-
-The order is the integration's own ranking. The card does not re-sort.
 
 If you would rather not install a card, the integration's
 [dashboard guide](https://github.com/rhgof/ha-bom-warnings/blob/main/docs/dashboard.md) has a
@@ -73,28 +96,18 @@ entity: sensor.home_thunderstorm_warning
 `entity` is one of the integration's per-type warning sensors (`sensor.<title>_<type>_warning`). The
 integration must be recent enough for those sensors to have a `color` attribute.
 
-The card is Home Assistant's own tile with its colour set from the sensor, so everything a tile has
-is there: tapping opens the sensor's history and activity, and the editor has the tile's own name,
-icon, state content (add the headline, summary or area), layout, interactions and features.
+The tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
+history and activity, and the editor has the tile's own name, icon, state content (add the
+headline, summary or area), layout, interactions and features.
 
 - **Colour.** While a warning is active its severity colour is used, even if the tile's **Colour**
   option is set. With no warning, that option (or the tile's default) applies.
 - **Hide when there is no warning.** Use the editor's **Visibility** tab and show the card only when
-  the state is not `none`. The card has no options of its own, because the tile's editor rejects
-  settings it does not know.
-- **Home Assistant versions.** It relies on two internals of the frontend, `loadCardHelpers()` and
-  the tile card's editor. It was checked on Home Assistant 2026.10.4 only, so check it after an
-  upgrade.
+  the state is not `none`.
+- **Home Assistant versions.** It was checked on Home Assistant 2026.10.4 only, so check the tile
+  after an upgrade. Why it is sensitive to upgrades is in [docs/development.md](docs/development.md).
 
-## Develop
+## Development
 
-```sh
-npm install
-npm test
-npm run build   # writes dist/bom-warnings-card.js, which HACS serves, so commit it
-```
-
-`tests/fixtures/states.json` is a copy of the integration's
-`tests/fixtures/dashboard/states.json`, the shared description of the attributes the card reads.
-The integration's own tests check that file against what it really produces, and this repo's CI
-fails if the copy falls behind. Copy it again when the integration's attributes change.
+Building, testing and how the card relates to the integration are in
+[docs/development.md](docs/development.md).
