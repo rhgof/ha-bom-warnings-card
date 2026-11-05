@@ -58,13 +58,33 @@ describe("the card's editor", () => {
     expect(card.getConfigElement().tagName.toLowerCase()).toBe("bom-warnings-card-editor");
   });
 
-  it("offers the entity, the title and the summary switch", async () => {
+  it("offers the entity, the title, what each row shows and the three actions", async () => {
     const schema = form(await mount()).schema;
 
-    expect(schema.map((f) => f.name)).toEqual(["entity", "title", "show_summary"]);
+    expect(schema.map((f) => f.name)).toEqual([
+      "entity",
+      "title",
+      "show_headline",
+      "show_area",
+      "show_summary",
+      "show_level",
+      "tap_action",
+      "hold_action",
+      "double_tap_action",
+    ]);
     expect(schema[0].required).toBe(true);
     expect(Object.keys(schema[0].selector)).toEqual(["entity"]);
-    expect(Object.keys(schema[2].selector)).toEqual(["boolean"]);
+    for (const field of schema.slice(2, 6)) {
+      expect(Object.keys(field.selector), field.name).toEqual(["boolean"]);
+    }
+  });
+
+  it("offers Home Assistant's own action picker, opening more-info on a tap by default", async () => {
+    const [tap, hold, double] = form(await mount()).schema.slice(6);
+
+    expect(tap.selector).toEqual({ ui_action: { default_action: "more-info" } });
+    expect(hold.selector).toEqual({ ui_action: { default_action: "none" } });
+    expect(double.selector).toEqual({ ui_action: { default_action: "none" } });
   });
 
   it("offers only the warning count sensors as the entity", async () => {
@@ -79,14 +99,30 @@ describe("the card's editor", () => {
   it("shows the current config, with the summary on by default", async () => {
     const data = form(await mount({ entity: "sensor.home_warning_count", title: "Home" })).data;
 
-    expect(data).toMatchObject({ entity: "sensor.home_warning_count", title: "Home", show_summary: true });
+    expect(data).toMatchObject({
+      entity: "sensor.home_warning_count",
+      title: "Home",
+      show_headline: true,
+      show_area: true,
+      show_summary: true,
+      show_level: true,
+      tap_action: { action: "more-info" },
+      hold_action: { action: "none" },
+      double_tap_action: { action: "none" },
+    });
+  });
+
+  it("shows an older config that only has show_summary as it always looked", async () => {
+    const data = form(await mount({ entity: "sensor.home_warning_count", show_summary: false })).data;
+
+    expect(data).toMatchObject({ show_summary: false, show_headline: true, show_area: true, show_level: true });
   });
 
   it("gives every field a label a person can read", async () => {
     const f = form(await mount());
 
-    for (const name of ["entity", "title", "show_summary"]) {
-      expect(f.computeLabel({ name })).not.toBe(name);
+    for (const { name } of f.schema) {
+      expect(f.computeLabel({ name }), name).not.toBe(name);
     }
   });
 
@@ -109,6 +145,63 @@ describe("the card's editor", () => {
     const [config] = change(editor, { entity: "sensor.home_warning_count", title: "", show_summary: true });
 
     expect(config).toEqual({ type: "custom:bom-warnings-card", entity: "sensor.home_warning_count" });
+  });
+
+  it.each(["show_headline", "show_area", "show_summary", "show_level"])(
+    "saves %s only when it is switched off",
+    async (option) => {
+      const editor = await mount({ entity: "sensor.home_warning_count" });
+
+      const [off] = change(editor, { entity: "sensor.home_warning_count", [option]: false });
+      const [on] = change(editor, { entity: "sensor.home_warning_count", [option]: true });
+
+      expect(off).toMatchObject({ [option]: false });
+      expect(on).not.toHaveProperty(option);
+    },
+  );
+
+  it("saves an action that is not the default, and leaves out one that is", async () => {
+    const editor = await mount({ entity: "sensor.home_warning_count" });
+    const navigate = { action: "navigate", navigation_path: "/history" };
+
+    const [chosen] = change(editor, {
+      entity: "sensor.home_warning_count",
+      tap_action: navigate,
+      hold_action: { action: "more-info" },
+      double_tap_action: { action: "toggle" },
+    });
+    const [defaults] = change(editor, {
+      entity: "sensor.home_warning_count",
+      tap_action: { action: "more-info" },
+      hold_action: { action: "none" },
+      double_tap_action: { action: "none" },
+    });
+
+    expect(chosen).toEqual({
+      type: "custom:bom-warnings-card",
+      entity: "sensor.home_warning_count",
+      tap_action: navigate,
+      hold_action: { action: "more-info" },
+      double_tap_action: { action: "toggle" },
+    });
+    expect(defaults).toEqual({ type: "custom:bom-warnings-card", entity: "sensor.home_warning_count" });
+  });
+
+  it("keeps the default action when it was given settings of its own", async () => {
+    const editor = await mount({ entity: "sensor.home_warning_count" });
+    const withEntity = { action: "more-info", entity: "sensor.cairns_warning_count" };
+
+    const [config] = change(editor, { entity: "sensor.home_warning_count", tap_action: withEntity });
+
+    expect(config.tap_action).toEqual(withEntity);
+  });
+
+  it("saves a tap action of none, since it differs from the more-info default", async () => {
+    const editor = await mount({ entity: "sensor.home_warning_count" });
+
+    const [config] = change(editor, { entity: "sensor.home_warning_count", tap_action: { action: "none" } });
+
+    expect(config.tap_action).toEqual({ action: "none" });
   });
 });
 

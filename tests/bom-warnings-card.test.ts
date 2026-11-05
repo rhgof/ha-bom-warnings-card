@@ -93,6 +93,41 @@ describe("the ranked list", () => {
   });
 });
 
+describe("what each row shows", () => {
+  const parts = ["headline", "area", "summary", "level"];
+
+  it("shows the headline, area, summary and level by default", async () => {
+    const [row] = rows(await mount(SCENARIOS.active));
+
+    for (const part of parts) {
+      expect(row.querySelector(`.${part}`), part).not.toBeNull();
+    }
+  });
+
+  it.each([
+    ["show_headline", "headline"],
+    ["show_area", "area"],
+    ["show_summary", "summary"],
+    ["show_level", "level"],
+  ])("leaves out the part %s controls when it is off, and only that part", async (option, part) => {
+    const card = await mount(SCENARIOS.active, { [option]: false });
+
+    for (const row of rows(card).slice(0, 2)) {
+      for (const other of parts) {
+        expect(row.querySelector(`.${other}`) === null, `${other} with ${option} off`).toBe(other === part);
+      }
+    }
+  });
+
+  it("still names the event, and dims an ended warning, with the level hidden", async () => {
+    const card = await mount(SCENARIOS.active, { show_level: false });
+    const [, , flood] = rows(card);
+
+    expect(text(flood.querySelector(".event"))).not.toBe("");
+    expect(flood.classList.contains("ended")).toBe(true);
+  });
+});
+
 describe("the card around the list", () => {
   it("says so when there are no warnings", async () => {
     const card = await mount(SCENARIOS.none);
