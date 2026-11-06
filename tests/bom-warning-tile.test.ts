@@ -111,10 +111,33 @@ describe("the wrapped tile", () => {
 
 describe("the level in the title", () => {
   // A sensor in a given state, with the name Home Assistant knows it by.
+  // A warning sensor has the list of its warnings, which is how the card knows a state is a level.
   const sensor = (state: string, friendlyName?: string): Scenario => ({
-    [HEAT]: { state, attributes: friendlyName ? { friendly_name: friendlyName } : {} },
+    [HEAT]: {
+      state,
+      attributes: { warnings: [], ...(friendlyName ? { friendly_name: friendlyName } : {}) },
+    },
   });
   const registry = (name: string) => ({ entities: { [HEAT]: { entity_id: HEAT, name } } });
+
+  // A fire danger rating has levels of its own, two of which share a word with a warning level.
+  const FIRE = "sensor.home_fire_danger_today";
+  const rating = (state: string): Scenario => ({
+    [FIRE]: {
+      state,
+      attributes: { level: state, color: "#FEDD3A", friendly_name: "Home Fire danger today" },
+    },
+  });
+
+  it.each(["no_rating", "moderate", "high", "extreme", "catastrophic"])(
+    "leaves a fire danger rating of %s untitled, but still coloured",
+    async (state) => {
+      const { tile } = await mount(rating(state), { entity: FIRE });
+
+      expect(tile.config).not.toHaveProperty("name");
+      expect(tile.config?.color).toBe("#FEDD3A");
+    },
+  );
 
   it.each([
     ["minor", "Minor Heatwave warning"],

@@ -124,7 +124,9 @@ export class BomWarningTile extends LitElement {
   // to build on, and never over a name the editor set.
   private _title(config: Config, hass: Hass): string | undefined {
     const state = hass.states[config.entity];
-    const level = LEVEL_WORDS[state?.state ?? ""];
+    // Only a warning sensor, which lists its warnings, has a warning level for a state. A fire
+    // danger rating has its own words, and two of them, moderate and extreme, look like levels.
+    const level = Array.isArray(state?.attributes.warnings) ? LEVEL_WORDS[state?.state ?? ""] : undefined;
     const friendly = state?.attributes.friendly_name;
     const name = hass.entities?.[config.entity]?.name || (typeof friendly === "string" ? friendly : "");
     return level && name ? `${level} ${name}` : undefined;

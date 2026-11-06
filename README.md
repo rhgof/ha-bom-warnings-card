@@ -119,6 +119,11 @@ recent enough for those sensors to have a `color` attribute.
 It also works on the **Most severe warning** sensor (`sensor.<title>_most_severe_warning`), coloured
 by whichever warning is on top. Its state is a headline, not a level, so its title gets no level.
 
+And on the integration's **fire danger** sensors (`sensor.<title>_fire_danger_today` and
+`..._tomorrow`), coloured by the rating with BoM's own legend: grey for no rating, green for
+moderate, yellow for high, orange for extreme and red for catastrophic. A rating is not a warning
+level, so these titles stay plain.
+
 The tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
 history and activity, and the editor has the tile's own name, icon, state content (add the
 headline, summary or area), layout, interactions and features.
