@@ -71,10 +71,11 @@ beforeEach(() => {
 async function mount(
   scenario: Scenario,
   config: Record<string, unknown> = {},
+  hass: Record<string, unknown> = {},
 ): Promise<{ card: Card; tile: Tile }> {
   const card = document.createElement("bom-warning-tile") as Card;
   card.setConfig({ type: "custom:bom-warning-tile", entity: MARINE, ...config });
-  card.hass = { states: scenario };
+  card.hass = { states: scenario, ...hass };
   document.body.append(card);
   await vi.waitFor(() => expect(made.length).toBeGreaterThan(0));
   const tile = made[made.length - 1];
@@ -105,6 +106,79 @@ describe("the wrapped tile", () => {
     const { card, tile } = await mount(ACTIVE);
 
     expect(card.shadowRoot!.contains(tile) || card.contains(tile)).toBe(true);
+  });
+});
+
+describe("the level in the title", () => {
+  // A sensor in a given state, with the name Home Assistant knows it by.
+  const sensor = (state: string, friendlyName?: string): Scenario => ({
+    [HEAT]: { state, attributes: friendlyName ? { friendly_name: friendlyName } : {} },
+  });
+  const registry = (name: string) => ({ entities: { [HEAT]: { entity_id: HEAT, name } } });
+
+  it.each([
+    ["minor", "Minor Heatwave warning"],
+    ["moderate", "Moderate Heatwave warning"],
+    ["unrated", "Unrated Heatwave warning"],
+    ["severe", "Severe Heatwave warning"],
+    ["extreme", "Extreme Heatwave warning"],
+  ])("puts the level %s in front of the sensor's own name", async (state, name) => {
+    const { tile } = await mount(sensor(state), { entity: HEAT }, registry("Heatwave warning"));
+
+    expect(tile.config?.name).toBe(name);
+  });
+
+  it("uses the entity's own name from the registry, not the one with the location in front", async () => {
+    const { tile } = await mount(
+      sensor("severe", "Cairns Heatwave warning"),
+      { entity: HEAT },
+      registry("Heatwave warning"),
+    );
+
+    expect(tile.config?.name).toBe("Severe Heatwave warning");
+  });
+
+  it("falls back to the friendly name when the registry has none", async () => {
+    const { tile } = await mount(sensor("severe", "Cairns Heatwave warning"), { entity: HEAT });
+
+    expect(tile.config?.name).toBe("Severe Cairns Heatwave warning");
+  });
+
+  it("leaves the name alone when the sensor has no name to build on", async () => {
+    const { tile } = await mount(sensor("severe"), { entity: HEAT });
+
+    expect(tile.config).not.toHaveProperty("name");
+  });
+
+  it.each(["none", "unavailable", "unknown", "Strong Wind Warning for Sydney Coast"])(
+    "adds nothing for the state %j, which is not a level",
+    async (state) => {
+      const { tile } = await mount(sensor(state), { entity: HEAT }, registry("Heatwave warning"));
+
+      expect(tile.config).not.toHaveProperty("name");
+    },
+  );
+
+  it("keeps a name set in the editor", async () => {
+    const { tile } = await mount(
+      sensor("severe"),
+      { entity: HEAT, name: "Heat" },
+      registry("Heatwave warning"),
+    );
+
+    expect(tile.config?.name).toBe("Heat");
+  });
+
+  it("follows the sensor as its level changes, and drops the level when the warning ends", async () => {
+    const hass = registry("Heatwave warning");
+    const { card, tile } = await mount(sensor("moderate"), { entity: HEAT }, hass);
+    expect(tile.config?.name).toBe("Moderate Heatwave warning");
+
+    card.hass = { states: sensor("extreme"), ...hass };
+    await vi.waitFor(() => expect(tile.config?.name).toBe("Extreme Heatwave warning"));
+
+    card.hass = { states: sensor("none"), ...hass };
+    await vi.waitFor(() => expect(tile.config).not.toHaveProperty("name"));
   });
 });
 

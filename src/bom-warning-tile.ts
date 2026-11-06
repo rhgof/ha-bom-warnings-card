@@ -13,6 +13,8 @@ interface HassState {
 
 interface Hass {
   states: Record<string, HassState | undefined>;
+  // The registry's display entries. `name` is the entity's own name, without its device's.
+  entities?: Record<string, { name?: string } | undefined>;
 }
 
 interface TileElement extends HTMLElement {
@@ -39,6 +41,16 @@ declare global {
 
 // A sensor's state is its level. `none` and anything else (unavailable, unknown) rank lowest.
 const LEVEL_RANK: Record<string, number> = { extreme: 4, severe: 3, moderate: 2, unrated: 2, minor: 1 };
+
+// How a level reads at the front of a tile's name. Only these states are levels: `none` and the
+// like have no warning to describe, and the Most severe sensor's state is a headline.
+const LEVEL_WORDS: Record<string, string> = {
+  minor: "Minor",
+  moderate: "Moderate",
+  unrated: "Unrated",
+  severe: "Severe",
+  extreme: "Extreme",
+};
 
 // The tile's own default size, used until the tile exists to say.
 const DEFAULT_GRID = { columns: 6, rows: 1 };
@@ -107,11 +119,29 @@ export class BomWarningTile extends LitElement {
     void this._sync();
   }
 
-  // The tile config the card wants now: whatever the editor set, with the sensor's colour on top
-  // while a warning is active. With no colour the tile keeps the editor's, or its own default.
+  // The name with the level in front, such as "Severe Heatwave warning", so the title says how bad
+  // the warning is where the colour alone cannot. Nothing when the sensor has no level or no name
+  // to build on, and never over a name the editor set.
+  private _title(config: Config, hass: Hass): string | undefined {
+    const state = hass.states[config.entity];
+    const level = LEVEL_WORDS[state?.state ?? ""];
+    const friendly = state?.attributes.friendly_name;
+    const name = hass.entities?.[config.entity]?.name || (typeof friendly === "string" ? friendly : "");
+    return level && name ? `${level} ${name}` : undefined;
+  }
+
+  // The tile config the card wants now: whatever the editor set, with the sensor's colour and the
+  // level in the name on top while a warning is active. Without them the tile keeps the editor's
+  // settings, or its own default.
   private _tileConfig(config: Config, hass: Hass): Record<string, unknown> {
     const colour = hass.states[config.entity]?.attributes.color;
-    return { ...config, type: "tile", ...(typeof colour === "string" && colour ? { color: colour } : {}) };
+    const title = config.name === undefined ? this._title(config, hass) : undefined;
+    return {
+      ...config,
+      type: "tile",
+      ...(typeof colour === "string" && colour ? { color: colour } : {}),
+      ...(title ? { name: title } : {}),
+    };
   }
 
   private async _sync(): Promise<void> {

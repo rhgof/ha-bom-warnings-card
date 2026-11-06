@@ -112,8 +112,12 @@ type: custom:bom-warning-tile
 entity: sensor.home_thunderstorm_warning
 ```
 
-`entity` is one of the integration's per-type warning sensors (`sensor.<title>_<type>_warning`). The
-integration must be recent enough for those sensors to have a `color` attribute.
+`entity` is one of the integration's per-type warning sensors (`sensor.<title>_<type>_warning`, for
+example `sensor.home_extreme_heat_warning`, which is the Heatwave warning). The integration must be
+recent enough for those sensors to have a `color` attribute.
+
+It also works on the **Most severe warning** sensor (`sensor.<title>_most_severe_warning`), coloured
+by whichever warning is on top. Its state is a headline, not a level, so its title gets no level.
 
 The tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
 history and activity, and the editor has the tile's own name, icon, state content (add the
@@ -121,6 +125,11 @@ headline, summary or area), layout, interactions and features.
 
 - **Colour.** While a warning is active its severity colour is used, even if the tile's **Colour**
   option is set. With no warning, that option (or the tile's default) applies.
+- **Level in the title.** While a warning is active the level goes in front of the sensor's name, so
+  the title reads, for example, "Severe Heatwave warning" or "Moderate Severe weather warning". With
+  no warning the title is the plain name. A name you set in the editor is used as it is, with no
+  level added. The state line below the title shows the level too if you keep `state` in the tile's
+  state content, so you may want to take it out and leave the headline.
 - **Hide when there is no warning.** Use the editor's **Visibility** tab and show the card only when
   the state is not `none`.
 - **Home Assistant versions.** It was checked on Home Assistant 2026.10.4 only, so check the tile
