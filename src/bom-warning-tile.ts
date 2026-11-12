@@ -52,6 +52,30 @@ const LEVEL_WORDS: Record<string, string> = {
   extreme: "Extreme",
 };
 
+// The tile's Name field set to "Entity": the sensor's own name, without the location's name that the
+// tile puts in front of it when left alone. A single non-text item is stored as the item itself.
+const ENTITY_NAME = { type: "entity" };
+
+// What a warning sensor's tile shows beside its level: the headline of the warning.
+const WARNING_CONTENT = ["state", "headline"];
+
+// Whether a name is the Entity default, which the level may still be put in front of, rather than
+// one the user chose (their own text, or a device or area name), which is shown as it is.
+function isEntityName(name: unknown): boolean {
+  if (name === undefined) {
+    return true;
+  }
+  const item = name as { type?: unknown };
+  return typeof name === "object" && name !== null && !Array.isArray(name) &&
+    item.type === "entity" && Object.keys(item).length === 1;
+}
+
+// A per-type warning sensor lists its warnings and has a level. The Most severe sensor has no level,
+// and a fire danger rating has no warnings list, and neither has a headline of its own to show.
+function isTypeSensor(state: HassState | undefined): boolean {
+  return Array.isArray(state?.attributes.warnings) && state?.attributes.level !== undefined;
+}
+
 // The tile's own default size, used until the tile exists to say.
 const DEFAULT_GRID = { columns: 6, rows: 1 };
 
@@ -96,7 +120,11 @@ export class BomWarningTile extends LitElement {
     );
     const rank = (state?: HassState) => LEVEL_RANK[state?.state ?? ""] ?? 0;
     const [best] = [...sensors].sort(([, a], [, b]) => rank(b) - rank(a));
-    return { entity: best?.[0] ?? "" };
+    if (!best) {
+      return { entity: "" };
+    }
+    // The defaults are in the config as well as applied at display time, so the editor shows them.
+    return { entity: best[0], name: ENTITY_NAME, state_content: WARNING_CONTENT };
   }
 
   setConfig(config: Config): void {
@@ -132,13 +160,16 @@ export class BomWarningTile extends LitElement {
     return level && name ? `${level} ${name}` : undefined;
   }
 
-  // The tile config the card wants now: whatever the editor set, with the sensor's colour and the
-  // level in the name on top while a warning is active. Without them the tile keeps the editor's
-  // settings, or its own default.
+  // The tile config the card wants now. Defaults come first so anything the editor set wins: the
+  // name is the entity's alone, and a warning sensor shows its headline. On top go the sensor's
+  // colour and, while a warning is active, the level in the name.
   private _tileConfig(config: Config, hass: Hass): Record<string, unknown> {
-    const colour = hass.states[config.entity]?.attributes.color;
-    const title = config.name === undefined ? this._title(config, hass) : undefined;
+    const state = hass.states[config.entity];
+    const colour = state?.attributes.color;
+    const title = isEntityName(config.name) ? this._title(config, hass) : undefined;
     return {
+      name: ENTITY_NAME,
+      ...(isTypeSensor(state) ? { state_content: WARNING_CONTENT } : {}),
       ...config,
       type: "tile",
       ...(typeof colour === "string" && colour ? { color: colour } : {}),

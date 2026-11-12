@@ -10,6 +10,9 @@ const MARINE = "sensor.home_marine_wind_warning"; // moderate, #FB8C00
 const HEAT = "sensor.home_extreme_heat_warning"; // severe, #D32F2F
 const THUNDER = "sensor.home_thunderstorm_warning"; // none, no colour
 
+// The tile's Name field set to Entity only, so the location's name is not in front of it.
+const ENTITY_NAME = { type: "entity" };
+
 interface Tile extends HTMLElement {
   config?: Record<string, unknown>;
   hass?: unknown;
@@ -134,7 +137,7 @@ describe("the level in the title", () => {
     async (state) => {
       const { tile } = await mount(rating(state), { entity: FIRE });
 
-      expect(tile.config).not.toHaveProperty("name");
+      expect(tile.config?.name).toEqual(ENTITY_NAME);
       expect(tile.config?.color).toBe("#FEDD3A");
     },
   );
@@ -167,10 +170,10 @@ describe("the level in the title", () => {
     expect(tile.config?.name).toBe("Severe Cairns Heatwave warning");
   });
 
-  it("leaves the name alone when the sensor has no name to build on", async () => {
+  it("shows the entity's name alone when the sensor has no name to build on", async () => {
     const { tile } = await mount(sensor("severe"), { entity: HEAT });
 
-    expect(tile.config).not.toHaveProperty("name");
+    expect(tile.config?.name).toEqual(ENTITY_NAME);
   });
 
   it.each(["none", "unavailable", "unknown", "Strong Wind Warning for Sydney Coast"])(
@@ -178,7 +181,7 @@ describe("the level in the title", () => {
     async (state) => {
       const { tile } = await mount(sensor(state), { entity: HEAT }, registry("Heatwave warning"));
 
-      expect(tile.config).not.toHaveProperty("name");
+      expect(tile.config?.name).toEqual(ENTITY_NAME);
     },
   );
 
@@ -201,7 +204,7 @@ describe("the level in the title", () => {
     await vi.waitFor(() => expect(tile.config?.name).toBe("Extreme Heatwave warning"));
 
     card.hass = { states: sensor("none"), ...hass };
-    await vi.waitFor(() => expect(tile.config).not.toHaveProperty("name"));
+    await vi.waitFor(() => expect(tile.config?.name).toEqual(ENTITY_NAME));
   });
 });
 
@@ -257,6 +260,89 @@ describe("the severity colour", () => {
 
     expect(tile.config).toMatchObject({ type: "tile", entity: "sensor.nope" });
     expect(tile.config).not.toHaveProperty("color");
+  });
+});
+
+describe("the tile's default name and content", () => {
+  const MOST = "sensor.home_most_severe_warning";
+  const FIRE = "sensor.home_fire_danger_today";
+  const typeSensor = (state: string, attributes: Record<string, unknown> = {}): Scenario => ({
+    [HEAT]: { state, attributes: { warnings: [], level: state, ...attributes } },
+  });
+
+  it("names a tile by its entity alone, so the location's name is not in front of it", async () => {
+    const { tile } = await mount(typeSensor("none"), { entity: HEAT });
+
+    expect(tile.config?.name).toEqual(ENTITY_NAME);
+  });
+
+  it("still puts the level in front when the name is the Entity default", async () => {
+    const { tile } = await mount(
+      typeSensor("severe"),
+      { entity: HEAT, name: ENTITY_NAME },
+      { entities: { [HEAT]: { entity_id: HEAT, name: "Heatwave warning" } } },
+    );
+
+    expect(tile.config?.name).toBe("Severe Heatwave warning");
+  });
+
+  it.each([
+    ["a text name", "Heat"],
+    ["the device's name", { type: "device" }],
+    ["the entity's name and its device's", [{ type: "device" }, { type: "entity" }]],
+  ])("keeps %s that was chosen in the editor", async (_label, name) => {
+    const { tile } = await mount(typeSensor("severe"), { entity: HEAT, name });
+
+    expect(tile.config?.name).toEqual(name);
+  });
+
+  it("shows the state and the headline on a warning sensor", async () => {
+    const { tile } = await mount(typeSensor("severe"), { entity: HEAT });
+
+    expect(tile.config?.state_content).toEqual(["state", "headline"]);
+  });
+
+  it("shows the headline while there is no warning too, so the content does not change shape", async () => {
+    const { tile } = await mount(typeSensor("none", { headline: null }), { entity: HEAT });
+
+    expect(tile.config?.state_content).toEqual(["state", "headline"]);
+  });
+
+  it("keeps content chosen in the editor", async () => {
+    const { tile } = await mount(typeSensor("severe"), {
+      entity: HEAT,
+      state_content: ["state", "expires"],
+    });
+
+    expect(tile.config?.state_content).toEqual(["state", "expires"]);
+  });
+
+  it("leaves a fire danger rating with the tile's own content, which has no headline", async () => {
+    const { tile } = await mount(
+      { [FIRE]: { state: "high", attributes: { level: "high" } } },
+      { entity: FIRE },
+    );
+
+    expect(tile.config).not.toHaveProperty("state_content");
+  });
+
+  it("leaves the most severe sensor with the tile's own content, since its state is the headline", async () => {
+    const { tile } = await mount(
+      { [MOST]: { state: "Severe heatwave warning", attributes: { warnings: [] } } },
+      { entity: MOST },
+    );
+
+    expect(tile.config).not.toHaveProperty("state_content");
+  });
+
+  it("starts a new card with both defaults, so the editor shows them", () => {
+    const cls = customElements.get("bom-warning-tile") as unknown as CardClass;
+
+    expect(cls.getStubConfig({ states: { [MARINE]: ACTIVE[MARINE] } })).toEqual({
+      entity: MARINE,
+      name: ENTITY_NAME,
+      state_content: ["state", "headline"],
+    });
   });
 });
 

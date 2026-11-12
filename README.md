@@ -132,9 +132,14 @@ headline, summary or area), layout, interactions and features.
   option is set. With no warning, that option (or the tile's default) applies.
 - **Level in the title.** While a warning is active the level goes in front of the sensor's name, so
   the title reads, for example, "Severe Heatwave warning" or "Moderate Severe weather warning". With
-  no warning the title is the plain name. A name you set in the editor is used as it is, with no
-  level added. The state line below the title shows the level too if you keep `state` in the tile's
-  state content, so you may want to take it out and leave the headline.
+  no warning the title is the plain name. A name you set in the editor (your own text, or the
+  device or area name) is used as it is, with no level added.
+- **Defaults.** A tile's **Name** is **Entity** alone, so the location's name is not in front of it
+  (it is already the card's heading). A warning sensor's **State content** is the state and the
+  headline, which a new tile starts with and an existing tile without either set now gets too.
+  Fire danger ratings and the Most severe sensor keep the tile's own content, because they have no
+  headline of their own to show. Anything you set in the editor wins. The state line shows the level
+  too, so take `state` out of the content if you want only the headline.
 - **Hide when there is no warning.** Use the editor's **Visibility** tab and show the card only when
   the state is not `none`.
 - **Home Assistant versions.** It was checked on Home Assistant 2026.10.4 only, so check the tile
