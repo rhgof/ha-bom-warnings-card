@@ -124,7 +124,17 @@ And on the integration's **fire danger** sensors (`sensor.<title>_fire_danger_to
 moderate, yellow for high, orange for extreme and red for catastrophic. A rating is not a warning
 level, so these titles stay plain.
 
-The tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
+**A current thunderstorm warning is drawn by this card**, because Home Assistant's tile can show an
+attribute as it is but cannot build a line from several. It shows "Severe thunderstorm" (never an
+"unrated" level, since BoM sends none), a **Detailed** tag for a storm-cell warning and a **Very
+dangerous** tag for BoM's top tier, the hazards in words ("Damaging winds · Large hail"), the summary
+of the paragraph that names your area, and "Update due by 3:10 pm" in your time zone, with "+1 more
+warning" when a broad and a detailed warning are both current. Tapping opens the sensor's history.
+This needs an integration that sends the `hazards`, `detailed`, `very_dangerous`, `next_issue` and
+`current` attributes. With no thunderstorm warning, and for every other type, the tile is as below.
+The ranked list shows the same two tags beside the event.
+
+Every other tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
 history and activity, and the editor has the tile's own name, icon, state content (add the
 headline, summary or area), layout, interactions and features.
 

@@ -128,6 +128,26 @@ describe("what each row shows", () => {
   });
 });
 
+describe("the thunderstorm tags", () => {
+  it("tags a detailed warning, and only that one", async () => {
+    const card = await mount(SCENARIOS.thunderstorm);
+
+    expect(rows(card).map((r) => text(r.querySelector(".badges")))).toEqual(["Detailed", ""]);
+  });
+
+  it("tags the very dangerous tier", async () => {
+    const card = await mount(SCENARIOS.thunderstorm_very_dangerous);
+
+    expect(text(rows(card)[0].querySelector(".badges"))).toBe("Very dangerous");
+  });
+
+  it("has no tags on a warning that is neither", async () => {
+    const card = await mount(SCENARIOS.active);
+
+    expect(card.shadowRoot!.querySelector(".badges")).toBeNull();
+  });
+});
+
 describe("the card around the list", () => {
   it("says so when there are no warnings", async () => {
     const card = await mount(SCENARIOS.none);

@@ -13,6 +13,9 @@ interface Warning {
   color?: string;
   area?: string;
   summary?: string;
+  // Thunderstorm only, and only when true.
+  detailed?: boolean;
+  very_dangerous?: boolean;
 }
 
 interface HassState {
@@ -158,6 +161,13 @@ export class BomWarningsCard extends LitElement {
       <div class="detail">
         <div class="title">
           <span class="event">${w.event}</span>
+          ${w.very_dangerous || w.detailed
+            ? html`<span class="badges"
+                >${[w.very_dangerous && "Very dangerous", w.detailed && "Detailed"]
+                  .filter(Boolean)
+                  .map((b) => html`<span class="badge">${b}</span>`)}</span
+              >`
+            : nothing}
           ${config.show_level !== false && detail
             ? html`<span class="level">(${detail})</span>`
             : nothing}
@@ -203,6 +213,18 @@ export class BomWarningsCard extends LitElement {
     }
     .event {
       font-weight: 500;
+    }
+    .badges {
+      display: inline-flex;
+      gap: 4px;
+      margin: 0 4px;
+    }
+    .badge {
+      font-size: 0.75em;
+      font-weight: 500;
+      padding: 1px 8px;
+      border-radius: 10px;
+      background: var(--secondary-background-color);
     }
     .level,
     .area,

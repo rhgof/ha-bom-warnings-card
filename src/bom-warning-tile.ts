@@ -1,4 +1,6 @@
-import { LitElement, css, nothing } from "lit";
+import { LitElement, css, html, nothing } from "lit";
+import { styleMap } from "lit/directives/style-map.js";
+import { thunderstormView, type Locale, type ThunderstormView } from "./thunderstorm-view";
 
 // Wraps Home Assistant's own tile card and sets its colour from the sensor's `color` attribute.
 // The tile gives the rest for free: tapping opens the entity's more-info (history and activity),
@@ -11,7 +13,7 @@ interface HassState {
   attributes: Record<string, unknown>;
 }
 
-interface Hass {
+interface Hass extends Locale {
   states: Record<string, HassState | undefined>;
   // The registry's display entries. `name` is the entity's own name, without its device's.
   entities?: Record<string, { name?: string } | undefined>;
@@ -134,13 +136,77 @@ export class BomWarningTile extends LitElement {
     this._config = config;
   }
 
+  // A current thunderstorm warning is drawn by this card, because the built-in tile can show an
+  // attribute as it is but not build "Damaging winds · Large hail" or "Update due by 3:10 pm".
+  // Every other state, and every other type, is the built-in tile.
+  private _thunderstorm(): ThunderstormView | undefined {
+    const entity = this._config?.entity;
+    return entity && this.hass ? thunderstormView(this.hass.states[entity], this.hass) : undefined;
+  }
+
   getCardSize(): number {
+    if (this._thunderstorm()) {
+      return 3;
+    }
     const size = this._tile?.getCardSize?.();
     return typeof size === "number" ? size : 1;
   }
 
   getGridOptions(): Record<string, unknown> {
+    if (this._thunderstorm()) {
+      return { columns: 6, min_columns: 4, rows: "auto" };
+    }
     return this._tile?.getGridOptions?.() ?? DEFAULT_GRID;
+  }
+
+  private _open = (): void => {
+    this.dispatchEvent(
+      new CustomEvent("hass-more-info", {
+        detail: { entityId: this._config?.entity },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private _key = (event: KeyboardEvent): void => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this._open();
+    }
+  };
+
+  private _thunderstormTile(view: ThunderstormView) {
+    const color = view.color ?? "var(--secondary-text-color)";
+    return html`<ha-card
+      class="thunderstorm"
+      role="button"
+      tabindex="0"
+      @click=${this._open}
+      @keydown=${this._key}
+    >
+      <div class="body">
+        <span
+          class="icon"
+          style=${styleMap({ background: `color-mix(in srgb, ${color} 20%, transparent)` })}
+        >
+          <ha-icon icon=${view.icon} style=${styleMap({ color })}></ha-icon>
+        </span>
+        <div class="detail">
+          <div class="heading">
+            <span class="title">${view.title}</span>
+            ${view.badges.length
+              ? html`<span class="badges"
+                  >${view.badges.map((b) => html`<span class="badge">${b}</span>`)}</span
+                >`
+              : nothing}
+          </div>
+          ${view.hazards ? html`<div class="hazards">${view.hazards}</div>` : nothing}
+          ${view.summary ? html`<div class="summary">${view.summary}</div>` : nothing}
+          ${view.footer ? html`<div class="footer">${view.footer}</div>` : nothing}
+        </div>
+      </div>
+    </ha-card>`;
   }
 
   updated(): void {
@@ -210,12 +276,67 @@ export class BomWarningTile extends LitElement {
   }
 
   render() {
-    return this._tile ?? nothing;
+    const view = this._thunderstorm();
+    return view ? this._thunderstormTile(view) : (this._tile ?? nothing);
   }
 
   static styles = css`
     :host {
       display: block;
+    }
+    ha-card.thunderstorm {
+      cursor: pointer;
+      height: 100%;
+    }
+    ha-card.thunderstorm:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: -2px;
+    }
+    .body {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      align-items: flex-start;
+    }
+    .icon {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+    }
+    .heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 8px;
+    }
+    .title {
+      font-weight: 500;
+    }
+    .badges {
+      display: inline-flex;
+      gap: 4px;
+    }
+    .badge {
+      font-size: 0.75em;
+      font-weight: 500;
+      padding: 1px 8px;
+      border-radius: 10px;
+      background: var(--secondary-background-color);
+    }
+    .hazards {
+      font-weight: 500;
+    }
+    .summary,
+    .footer {
+      color: var(--secondary-text-color);
+      font-size: 0.9em;
+    }
+    .footer {
+      margin-top: 4px;
     }
   `;
 }
