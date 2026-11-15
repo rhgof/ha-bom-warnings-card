@@ -116,8 +116,10 @@ entity: sensor.home_thunderstorm_warning
 example `sensor.home_extreme_heat_warning`, which is the Heatwave warning). The integration must be
 recent enough for those sensors to have a `color` attribute.
 
-It also works on the **Most severe warning** sensor (`sensor.<title>_most_severe_warning`), coloured
-by whichever warning is on top. Its state is a headline, not a level, so its title gets no level.
+It also works on the **Most severe warning** sensor (`sensor.<title>_most_severe_warning`), which is a
+level sensor like the others: its state is the level of whichever warning is on top, of any type, and
+its title, colour and headline are that warning's. (Before the integration changed this, its state was
+the headline.)
 
 And on the integration's **fire danger** sensors (`sensor.<title>_fire_danger_today` and
 `..._tomorrow`), coloured by the rating with BoM's own legend: grey for no rating, green for
@@ -150,8 +152,8 @@ headline, summary or area), layout, interactions and features.
 - **Defaults.** A tile's **Name** is **Entity** alone, so the location's name is not in front of it
   (it is already the card's heading). A warning sensor's **State content** is the state and the
   headline, which a new tile starts with and an existing tile without either set now gets too.
-  Fire danger ratings and the Most severe sensor keep the tile's own content, because they have no
-  headline of their own to show. Anything you set in the editor wins. The state line shows the level
+  Fire danger ratings keep the tile's own content, because they have no headline of their own to
+  show. Anything you set in the editor wins. The state line shows the level
   too, so take `state` out of the content if you want only the headline.
 - **Hide when there is no warning.** Use the editor's **Visibility** tab and show the card only when
   the state is not `none`.

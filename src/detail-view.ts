@@ -75,7 +75,7 @@ function footer(attributes: Record<string, unknown>, hass: Locale): string | und
 
 // Undefined unless the sensor asks for the detail layout, which it does only while its type has a
 // current warning, so everything else keeps the built-in tile. The Most severe sensor repeats its
-// top warning's fields but never sends `layout`, so it is not mistaken for a type sensor.
+// top warning's fields but never sends `layout`, so it always keeps the built-in tile.
 export function detailView(state: HassState | undefined, hass: Locale): DetailView | undefined {
   const attributes = state?.attributes;
   const title = text(attributes?.title);

@@ -190,9 +190,10 @@ describe("everything else stays the built-in tile", () => {
       .warnings as Record<string, unknown>[];
     SCENARIOS.most_severe = {
       "sensor.home_most_severe_warning": {
-        // Its state is the headline, and its attributes are the top warning's, event included.
-        state: String(top.headline),
-        attributes: { ...top, warnings: [top] },
+        // Its state is a level, and its attributes are the top warning's, event included, but it
+        // never sends `layout`.
+        state: "severe",
+        attributes: { ...top, level: "severe", warnings: [top] },
       },
     };
 

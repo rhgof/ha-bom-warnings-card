@@ -295,13 +295,19 @@ describe("the tile's default name and content", () => {
     expect(tile.config).not.toHaveProperty("state_content");
   });
 
-  it("leaves the most severe sensor with the tile's own content, since its state is the headline", async () => {
+  it("treats the most severe sensor like any other warning sensor, since its state is a level", async () => {
     const { tile } = await mount(
-      { [MOST]: { state: "Severe heatwave warning", attributes: { warnings: [] } } },
+      {
+        [MOST]: {
+          state: "severe",
+          attributes: { warnings: [], level: "severe", title: "Severe Heatwave warning" },
+        },
+      },
       { entity: MOST },
     );
 
-    expect(tile.config).not.toHaveProperty("state_content");
+    expect(tile.config?.state_content).toEqual(["state", "headline"]);
+    expect(tile.config?.name).toBe("Severe Heatwave warning");
   });
 
   it("starts a new card with both defaults, so the editor shows them", () => {
@@ -400,6 +406,15 @@ describe("how the card behaves on a dashboard", () => {
           "sensor.b_flood_warning": sensor("unavailable"),
         }),
       ).toBe("sensor.a_wind_warning");
+    });
+
+    it("can start on the Most severe sensor, which is a level sensor like the others", () => {
+      expect(
+        stub({
+          "sensor.a_wind_warning": sensor("minor"),
+          "sensor.a_most_severe_warning": sensor("extreme"),
+        }),
+      ).toBe("sensor.a_most_severe_warning");
     });
 
     it("counts an unrated warning as one", () => {

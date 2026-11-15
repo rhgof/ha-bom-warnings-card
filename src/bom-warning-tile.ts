@@ -59,8 +59,8 @@ function isEntityName(name: unknown): boolean {
     item.type === "entity" && Object.keys(item).length === 1;
 }
 
-// A per-type warning sensor lists its warnings and has a level. The Most severe sensor has no level,
-// and a fire danger rating has no warnings list, and neither has a headline of its own to show.
+// A warning sensor (per-type or Most severe) lists its warnings and has a level. A fire danger
+// rating has no warnings list and no headline of its own to show.
 function isTypeSensor(state: HassState | undefined): boolean {
   return Array.isArray(state?.attributes.warnings) && state?.attributes.level !== undefined;
 }
@@ -103,7 +103,6 @@ export class BomWarningTile extends LitElement {
       ([id, state]) =>
         id.startsWith("sensor.") &&
         id.endsWith("_warning") &&
-        !id.endsWith("_most_severe_warning") &&
         state?.attributes.level !== undefined &&
         Array.isArray(state.attributes.warnings),
     );
