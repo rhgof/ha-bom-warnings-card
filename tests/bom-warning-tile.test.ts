@@ -154,6 +154,13 @@ describe("the level in the title", () => {
     expect(tile.config?.name).toBe(name);
   });
 
+  it("does not repeat the level when the name already begins with it", async () => {
+    const { tile } = await mount(sensor("severe"), { entity: HEAT }, registry("Severe weather warning"));
+
+    // The tile's own Entity name is left to say it: "Severe weather warning", not "Severe Severe ...".
+    expect(tile.config?.name).toEqual(ENTITY_NAME);
+  });
+
   it("uses the entity's own name from the registry, not the one with the location in front", async () => {
     const { tile } = await mount(
       sensor("severe", "Cairns Heatwave warning"),

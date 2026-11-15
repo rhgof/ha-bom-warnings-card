@@ -129,20 +129,31 @@ describe("what each row shows", () => {
 });
 
 describe("a level BoM does not give", () => {
-  it("says nothing about the level of a thunderstorm, which is always unknown or unrated", async () => {
+  const withLevel = (level: string, phase?: string): Scenario => {
+    const scenario = structuredClone(SCENARIOS.thunderstorm);
+    const list = scenario[COUNT].attributes.warnings as Record<string, string>[];
+    list[0].level = level;
+    if (phase) {
+      list[0].phase = phase;
+    }
+    return scenario;
+  };
+
+  it("calls a thunderstorm severe, which is what BoM names it", async () => {
     const card = await mount(SCENARIOS.thunderstorm);
 
-    for (const row of rows(card)) {
-      expect(text(row.querySelector(".title"))).not.toMatch(/unknown|unrated/i);
-      expect(row.querySelector(".level")).toBeNull();
-    }
+    expect(rows(card).map((r) => text(r.querySelector(".level")))).toEqual(["(severe)", "(severe)"]);
+  });
+
+  it.each(["unknown", "unrated"])("says nothing of a level that is %s", async (level) => {
+    const card = await mount(withLevel(level));
+
+    expect(rows(card)[0].querySelector(".level")).toBeNull();
+    expect(text(rows(card)[0].querySelector(".title"))).not.toMatch(/unknown|unrated/i);
   });
 
   it("still shows the phase of an ended warning with an unknown level", async () => {
-    const scenario = structuredClone(SCENARIOS.thunderstorm);
-    const list = scenario[COUNT].attributes.warnings as Record<string, string>[];
-    list[0].phase = "cancelled";
-    const card = await mount(scenario);
+    const card = await mount(withLevel("unknown", "cancelled"));
 
     expect(text(rows(card)[0].querySelector(".level"))).toBe("(cancelled)");
   });

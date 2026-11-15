@@ -223,6 +223,11 @@ export class BomWarningTile extends LitElement {
     const level = Array.isArray(state?.attributes.warnings) ? LEVEL_WORDS[state?.state ?? ""] : undefined;
     const friendly = state?.attributes.friendly_name;
     const name = hass.entities?.[config.entity]?.name || (typeof friendly === "string" ? friendly : "");
+    // A name that already begins with the level, such as "Severe weather warning" at `severe`, is
+    // left as it is, since the level in front would say it twice.
+    if (level && name.toLowerCase().startsWith(level.toLowerCase())) {
+      return undefined;
+    }
     return level && name ? `${level} ${name}` : undefined;
   }
 
