@@ -128,6 +128,26 @@ describe("what each row shows", () => {
   });
 });
 
+describe("a level BoM does not give", () => {
+  it("says nothing about the level of a thunderstorm, which is always unknown or unrated", async () => {
+    const card = await mount(SCENARIOS.thunderstorm);
+
+    for (const row of rows(card)) {
+      expect(text(row.querySelector(".title"))).not.toMatch(/unknown|unrated/i);
+      expect(row.querySelector(".level")).toBeNull();
+    }
+  });
+
+  it("still shows the phase of an ended warning with an unknown level", async () => {
+    const scenario = structuredClone(SCENARIOS.thunderstorm);
+    const list = scenario[COUNT].attributes.warnings as Record<string, string>[];
+    list[0].phase = "cancelled";
+    const card = await mount(scenario);
+
+    expect(text(rows(card)[0].querySelector(".level"))).toBe("(cancelled)");
+  });
+});
+
 describe("the thunderstorm tags", () => {
   it("tags a detailed warning, and only that one", async () => {
     const card = await mount(SCENARIOS.thunderstorm);

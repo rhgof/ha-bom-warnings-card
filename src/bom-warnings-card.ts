@@ -44,6 +44,8 @@ declare global {
 }
 
 const ENDED = ["final", "cancelled"];
+// BoM sends no grade for a Severe Thunderstorm or Severe Weather warning, so its level says nothing.
+const NO_LEVEL = ["unknown", "unrated"];
 
 export class BomWarningsCard extends LitElement {
   // Declared this way, not with decorators, so the build needs no decorator settings.
@@ -152,7 +154,8 @@ export class BomWarningsCard extends LitElement {
 
   _row(w: Warning, config: Config) {
     const ended = ENDED.includes(w.phase ?? "");
-    const detail = [w.level, ended ? w.phase : undefined].filter(Boolean).join(", ");
+    const level = NO_LEVEL.includes(w.level ?? "") ? undefined : w.level;
+    const detail = [level, ended ? w.phase : undefined].filter(Boolean).join(", ");
     return html`<div class="warning ${ended ? "ended" : ""}">
       <ha-icon
         icon=${w.icon ?? "mdi:alert"}
