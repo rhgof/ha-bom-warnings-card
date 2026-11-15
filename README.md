@@ -77,7 +77,7 @@ entity: sensor.home_warning_count
 | `show_headline` | `true` | Set to `false` to leave out each warning's headline. |
 | `show_area` | `true` | Set to `false` to leave out the names of the areas each warning covers. |
 | `show_summary` | `true` | Whether the summaries are showing when the card loads. Set to `false` to start with them hidden. |
-| `show_level` | `true` | Set to `false` to leave out each warning's level and phase, for example `(moderate, final)`. An ended warning is still dimmed. |
+| `show_level` | `true` | Set to `false` to leave out each warning's level and phase, for example `(moderate, final)`. An ended warning is still dimmed. A level of `unknown` or `unrated`, which says nothing, is always left out. A thunderstorm shows `(severe)`, and gets a **Detailed** or **Very dangerous** tag beside its name when it is one. |
 
 The event name and icon always show. Each option is in the card's editor too, so none of them needs
 YAML.
@@ -125,8 +125,8 @@ moderate, yellow for high, orange for extreme and red for catastrophic. A rating
 level, so these titles stay plain.
 
 **A current thunderstorm warning is drawn by this card**, because Home Assistant's tile can show an
-attribute as it is but cannot build a line from several. It shows "Severe thunderstorm" (never an
-"unrated" level, since BoM sends none), a **Detailed** tag for a storm-cell warning and a **Very
+attribute as it is but cannot build a line from several. It shows "Severe thunderstorm" (the title never
+carries a level word, since the warning is severe by name), a **Detailed** tag for a storm-cell warning and a **Very
 dangerous** tag for BoM's top tier, the hazards in words ("Damaging winds · Large hail"), the summary
 of the paragraph that names your area, and "Update due by 3:10 pm" in your time zone, with "+1 more
 warning" when a broad and a detailed warning are both current. Tapping opens the sensor's history.
@@ -143,7 +143,9 @@ headline, summary or area), layout, interactions and features.
 - **Level in the title.** While a warning is active the level goes in front of the sensor's name, so
   the title reads, for example, "Severe Heatwave warning" or "Moderate Severe weather warning". With
   no warning the title is the plain name. A name you set in the editor (your own text, or the
-  device or area name) is used as it is, with no level added.
+  device or area name) is used as it is, with no level added. A name that already begins with the
+  level, such as "Severe weather warning" at `severe`, is left alone, so it never reads "Severe
+  Severe weather warning".
 - **Defaults.** A tile's **Name** is **Entity** alone, so the location's name is not in front of it
   (it is already the card's heading). A warning sensor's **State content** is the state and the
   headline, which a new tile starts with and an existing tile without either set now gets too.
