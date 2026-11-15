@@ -71,14 +71,21 @@ function footer(attributes: Record<string, unknown>, hass: Locale): string | und
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-// Undefined unless the sensor is a thunderstorm sensor with a warning in force, so everything else
-// keeps the built-in tile.
+// Undefined unless the sensor is the thunderstorm type sensor with a warning in force, so everything
+// else keeps the built-in tile. A type sensor's state is its level, the same as its `level`
+// attribute. The Most severe sensor repeats its top warning's fields, `event` included, but its
+// state is a headline, so it is not mistaken for one.
 export function thunderstormView(
   state: HassState | undefined,
   hass: Locale,
 ): ThunderstormView | undefined {
   const attributes = state?.attributes;
-  if (!attributes || attributes.event !== "Thunderstorm" || state.state === "none") {
+  if (
+    !attributes ||
+    attributes.event !== "Thunderstorm" ||
+    state.state === "none" ||
+    state.state !== attributes.level
+  ) {
     return undefined;
   }
   return {

@@ -168,6 +168,23 @@ describe("everything else stays the built-in tile", () => {
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
+  it("shows the built-in tile for the Most severe sensor, which repeats its top warning's fields", async () => {
+    const [top] = SCENARIOS.thunderstorm["sensor.home_warning_count"].attributes
+      .warnings as Record<string, unknown>[];
+    SCENARIOS.most_severe = {
+      "sensor.home_most_severe_warning": {
+        // Its state is the headline, and its attributes are the top warning's, event included.
+        state: String(top.headline),
+        attributes: { ...top, warnings: [top] },
+      },
+    };
+
+    const card = await mount("most_severe", "sensor.home_most_severe_warning");
+
+    expect(card.shadowRoot?.querySelector(".thunderstorm")).toBeNull();
+    expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
+  });
+
   it("goes back to the built-in tile when the warning ends", async () => {
     const card = await mount("thunderstorm");
 
