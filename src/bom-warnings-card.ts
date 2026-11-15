@@ -7,15 +7,17 @@ import "./bom-warnings-card-editor";
 interface Warning {
   event: string;
   headline: string;
-  level?: string;
+  // None when BoM sends no grade for the warning.
+  level?: string | null;
   phase?: string;
+  // Whether the warning is cancelled or final.
+  ended?: boolean;
   icon?: string;
   color?: string;
   area?: string;
   summary?: string;
-  // Thunderstorm only, and only when true.
-  detailed?: boolean;
-  very_dangerous?: boolean;
+  // Ready to show beside the event, such as "Very dangerous".
+  badges?: string[];
 }
 
 interface HassState {
@@ -42,10 +44,6 @@ declare global {
     customCards?: { type: string; name: string; description: string }[];
   }
 }
-
-const ENDED = ["final", "cancelled"];
-// BoM sends no grade for a Severe Thunderstorm or Severe Weather warning, so its level says nothing.
-const NO_LEVEL = ["unknown", "unrated"];
 
 export class BomWarningsCard extends LitElement {
   // Declared this way, not with decorators, so the build needs no decorator settings.
@@ -153,9 +151,8 @@ export class BomWarningsCard extends LitElement {
   }
 
   _row(w: Warning, config: Config) {
-    const ended = ENDED.includes(w.phase ?? "");
-    const level = NO_LEVEL.includes(w.level ?? "") ? undefined : w.level;
-    const detail = [level, ended ? w.phase : undefined].filter(Boolean).join(", ");
+    const ended = w.ended === true;
+    const detail = [w.level, ended ? w.phase : undefined].filter(Boolean).join(", ");
     return html`<div class="warning ${ended ? "ended" : ""}">
       <ha-icon
         icon=${w.icon ?? "mdi:alert"}
@@ -164,11 +161,9 @@ export class BomWarningsCard extends LitElement {
       <div class="detail">
         <div class="title">
           <span class="event">${w.event}</span>
-          ${w.very_dangerous || w.detailed
+          ${w.badges?.length
             ? html`<span class="badges"
-                >${[w.very_dangerous && "Very dangerous", w.detailed && "Detailed"]
-                  .filter(Boolean)
-                  .map((b) => html`<span class="badge">${b}</span>`)}</span
+                >${w.badges.map((b) => html`<span class="badge">${b}</span>`)}</span
               >`
             : nothing}
           ${config.show_level !== false && detail

@@ -1,6 +1,8 @@
-// What a current thunderstorm warning shows on its tile, worked out from the sensor's attributes.
-// Pure, so it is tested without a browser. The integration's tests check the attribute names
-// against the real BoM products (see docs/development.md).
+// What a warning shows on the detail tile, worked out from the sensor's attributes. Pure, so it is
+// tested without a browser. The integration decides which sensors get this tile (`layout`) and
+// sends the title, colour, icon and badges, so nothing here depends on the warning's event. The
+// integration's tests check the attribute names against the real BoM products (see
+// docs/development.md).
 
 interface HassState {
   state: string;
@@ -12,7 +14,7 @@ export interface Locale {
   config?: { time_zone?: string };
 }
 
-export interface ThunderstormView {
+export interface DetailView {
   title: string;
   icon: string;
   color?: string;
@@ -30,7 +32,7 @@ const HAZARD_WORDS: Record<string, string> = {
   flood: "Flash flooding",
 };
 
-const DEFAULT_ICON = "mdi:weather-lightning-rainy";
+const DEFAULT_ICON = "mdi:alert-circle";
 
 function text(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
@@ -71,33 +73,20 @@ function footer(attributes: Record<string, unknown>, hass: Locale): string | und
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-// Undefined unless the sensor is the thunderstorm type sensor with a warning in force, so everything
-// else keeps the built-in tile. A type sensor's state is its level, the same as its `level`
-// attribute. The Most severe sensor repeats its top warning's fields, `event` included, but its
-// state is a headline, so it is not mistaken for one.
-export function thunderstormView(
-  state: HassState | undefined,
-  hass: Locale,
-): ThunderstormView | undefined {
+// Undefined unless the sensor asks for the detail layout, which it does only while its type has a
+// current warning, so everything else keeps the built-in tile. The Most severe sensor repeats its
+// top warning's fields but never sends `layout`, so it is not mistaken for a type sensor.
+export function detailView(state: HassState | undefined, hass: Locale): DetailView | undefined {
   const attributes = state?.attributes;
-  if (
-    !attributes ||
-    attributes.event !== "Thunderstorm" ||
-    state.state === "none" ||
-    state.state !== attributes.level
-  ) {
+  const title = text(attributes?.title);
+  if (!attributes || attributes.layout !== "detail" || !title) {
     return undefined;
   }
   return {
-    // Every thunderstorm warning is "Severe" by BoM's definition, and its level is always unrated,
-    // so the title says what the warning is, not how bad CAP rates it.
-    title: "Severe thunderstorm",
-    icon: DEFAULT_ICON,
+    title,
+    icon: text(attributes.icon) ?? DEFAULT_ICON,
     color: text(attributes.color),
-    badges: [
-      ...(attributes.very_dangerous === true ? ["Very dangerous"] : []),
-      ...(attributes.detailed === true ? ["Detailed"] : []),
-    ],
+    badges: Array.isArray(attributes.badges) ? attributes.badges.filter((b) => typeof b === "string") : [],
     hazards: hazardsLine(attributes.hazards),
     summary: text(attributes.summary),
     footer: footer(attributes, hass),

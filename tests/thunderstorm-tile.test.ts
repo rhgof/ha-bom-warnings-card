@@ -60,13 +60,13 @@ const mutated = (scenario: string, change: (attrs: Record<string, unknown>) => v
   SCENARIOS.mutated = copy;
 };
 
-describe("a current thunderstorm warning", () => {
-  it("is its own tile, titled for the kind of warning and never for an unrated level", async () => {
+describe("a current warning whose sensor asks for the detail layout", () => {
+  it("is its own tile, titled with the title the sensor sends and never an unrated level", async () => {
     const card = await mount("thunderstorm");
 
-    expect(card.shadowRoot?.querySelector(".thunderstorm")).not.toBeNull();
+    expect(card.shadowRoot?.querySelector(".detail-tile")).not.toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).toBeNull();
-    expect(text(card, ".title")).toBe("Severe thunderstorm");
+    expect(text(card, ".title")).toBe("Severe thunderstorm warning");
     expect(card.shadowRoot?.textContent).not.toMatch(/unrated/i);
   });
 
@@ -97,12 +97,29 @@ describe("a current thunderstorm warning", () => {
     expect(text(card, ".footer")).toBe("Update due by 5:40 pm");
   });
 
-  it("takes the sensor's colour for its icon", async () => {
-    const card = await mount("thunderstorm");
+  it("takes the sensor's colour and icon", async () => {
+    mutated("thunderstorm", (a) => {
+      a.icon = "mdi:weather-lightning-rainy";
+    });
+    const card = await mount("mutated");
 
     const icon = card.shadowRoot?.querySelector("ha-icon");
     expect(icon?.getAttribute("style")).toContain("#FF6F00");
     expect(icon?.getAttribute("icon")).toBe("mdi:weather-lightning-rainy");
+  });
+
+  it("is drawn for any event whose sensor asks for it, since the card never checks the event", async () => {
+    SCENARIOS.marine_detail = structuredClone(SCENARIOS.active);
+    Object.assign(SCENARIOS.marine_detail[MARINE].attributes, {
+      layout: "detail",
+      title: "Moderate Marine wind warning",
+      badges: ["Gale"],
+    });
+    const card = await mount("marine_detail", MARINE);
+
+    expect(card.shadowRoot?.querySelector(".detail-tile")).not.toBeNull();
+    expect(text(card, ".title")).toBe("Moderate Marine wind warning");
+    expect(text(card, ".badges")).toBe("Gale");
   });
 
   it("leaves out each line the sensor gives nothing for", async () => {
@@ -110,7 +127,7 @@ describe("a current thunderstorm warning", () => {
       delete a.hazards;
       delete a.summary;
       delete a.next_issue;
-      delete a.detailed;
+      a.badges = [];
       a.current = 1;
     });
     const card = await mount("mutated");
@@ -119,7 +136,7 @@ describe("a current thunderstorm warning", () => {
     expect(card.shadowRoot?.querySelector(".summary")).toBeNull();
     expect(card.shadowRoot?.querySelector(".footer")).toBeNull();
     expect(card.shadowRoot?.querySelector(".badges")).toBeNull();
-    expect(text(card, ".title")).toBe("Severe thunderstorm");
+    expect(text(card, ".title")).toBe("Severe thunderstorm warning");
   });
 
   it("says how many more warnings there are, in the plural too", async () => {
@@ -136,7 +153,7 @@ describe("a current thunderstorm warning", () => {
     const card = await mount("thunderstorm");
     const opened: unknown[] = [];
     card.addEventListener("hass-more-info", (e) => opened.push((e as CustomEvent).detail));
-    const tile = card.shadowRoot?.querySelector<HTMLElement>(".thunderstorm");
+    const tile = card.shadowRoot?.querySelector<HTMLElement>(".detail-tile");
 
     tile?.click();
     tile?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
@@ -157,14 +174,14 @@ describe("everything else stays the built-in tile", () => {
   it("shows the built-in tile when there is no thunderstorm warning", async () => {
     const card = await mount("none");
 
-    expect(card.shadowRoot?.querySelector(".thunderstorm")).toBeNull();
+    expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
   it("shows the built-in tile for another type, even with a thunderstorm sensor active", async () => {
     const card = await mount("active", MARINE);
 
-    expect(card.shadowRoot?.querySelector(".thunderstorm")).toBeNull();
+    expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
@@ -181,7 +198,7 @@ describe("everything else stays the built-in tile", () => {
 
     const card = await mount("most_severe", "sensor.home_most_severe_warning");
 
-    expect(card.shadowRoot?.querySelector(".thunderstorm")).toBeNull();
+    expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
@@ -191,7 +208,7 @@ describe("everything else stays the built-in tile", () => {
     card.hass = { states: SCENARIOS.none, ...SYDNEY };
     await card.updateComplete;
 
-    expect(card.shadowRoot?.querySelector(".thunderstorm")).toBeNull();
+    expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 });

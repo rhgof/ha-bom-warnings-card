@@ -7,8 +7,8 @@
 | `src/index.ts` | Entry point. HACS serves one file, so both cards are bundled into it. |
 | `src/bom-warnings-card.ts` | The ranked list, `custom:bom-warnings-card`. Reads the `warnings` attribute of the integration's count sensor. |
 | `src/bom-warnings-card-editor.ts` | The visual editor for that card. |
-| `src/bom-warning-tile.ts` | The tile, `custom:bom-warning-tile`. Wraps Home Assistant's own tile card and sets its colour from the sensor's `color` attribute. While a thunderstorm warning is current it draws its own tile instead. |
-| `src/thunderstorm-view.ts` | Pure: what that tile shows (title, tags, hazards, summary, "Update due by"), worked out from the sensor's attributes. |
+| `src/bom-warning-tile.ts` | The tile, `custom:bom-warning-tile`. Wraps Home Assistant's own tile card and sets its colour from the sensor's `color` attribute. While a sensor sends `layout: "detail"` it draws its own tile instead. |
+| `src/detail-view.ts` | Pure: what that tile shows (title, badges, hazards, summary, "Update due by"), worked out from the sensor's attributes. |
 | `tests/` | Vitest tests, one file per source file, plus `bundle.test.ts` for the built file. |
 | `tests/fixtures/states.json` | A copy of the integration's `tests/fixtures/dashboard/states.json`. See below. |
 | `dist/bom-warnings-card.js` | The built bundle. HACS serves this committed file. |
@@ -35,9 +35,9 @@ commit both.
 
 The card has no settings that tune the integration. Its only inputs are the entity ids and
 attributes in the fixture: the count sensor's `warnings` list (`event`, `headline`, `level`,
-`phase`, `icon`, `color`, `area`, `summary`, and for thunderstorms `hazards`, `detailed`,
-`very_dangerous`), and the per-type sensors' state, `color` and, for thunderstorms, `event`,
-`hazards`, `detailed`, `very_dangerous`, `summary`, `next_issue` and `current`. The `thunderstorm`
+`title`, `rank`, `ended`, `badges`, `phase`, `icon`, `color`, `area`, `summary`), and the per-type
+sensors' state, `color`, `title`, `rank`, `badges`, `layout`, `icon`, `summary`, `hazards`,
+`next_issue` and `current`. The card holds no level words, ranks or event names of its own. The `thunderstorm`
 scenarios in the fixture are generated from real BoM products by the integration's own code.
 
 ## Home Assistant internals

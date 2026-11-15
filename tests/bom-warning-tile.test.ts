@@ -112,18 +112,13 @@ describe("the wrapped tile", () => {
   });
 });
 
-describe("the level in the title", () => {
-  // A sensor in a given state, with the name Home Assistant knows it by.
-  // A warning sensor has the list of its warnings, which is how the card knows a state is a level.
-  const sensor = (state: string, friendlyName?: string): Scenario => ({
-    [HEAT]: {
-      state,
-      attributes: { warnings: [], ...(friendlyName ? { friendly_name: friendlyName } : {}) },
-    },
+describe("the title", () => {
+  // The integration sends the title with the level in front, so the card only has to show it.
+  const sensor = (state: string, attributes: Record<string, unknown> = {}): Scenario => ({
+    [HEAT]: { state, attributes: { warnings: [], level: state, ...attributes } },
   });
-  const registry = (name: string) => ({ entities: { [HEAT]: { entity_id: HEAT, name } } });
 
-  // A fire danger rating has levels of its own, two of which share a word with a warning level.
+  // A fire danger rating has levels of its own and no title, so it stays untitled.
   const FIRE = "sensor.home_fire_danger_today";
   const rating = (state: string): Scenario => ({
     [FIRE]: {
@@ -142,75 +137,43 @@ describe("the level in the title", () => {
     },
   );
 
-  it.each([
-    ["minor", "Minor Heatwave warning"],
-    ["moderate", "Moderate Heatwave warning"],
-    ["unrated", "Unrated Heatwave warning"],
-    ["severe", "Severe Heatwave warning"],
-    ["extreme", "Extreme Heatwave warning"],
-  ])("puts the level %s in front of the sensor's own name", async (state, name) => {
-    const { tile } = await mount(sensor(state), { entity: HEAT }, registry("Heatwave warning"));
+  it.each(["Severe Heatwave warning", "Severe weather warning", "Moderate Frost warning"])(
+    "names the tile %j, the title the sensor sends",
+    async (title) => {
+      const { tile } = await mount(sensor("severe", { title }), { entity: HEAT });
 
-    expect(tile.config?.name).toBe(name);
-  });
+      expect(tile.config?.name).toBe(title);
+    },
+  );
 
-  it("does not repeat the level when the name already begins with it", async () => {
-    const { tile } = await mount(sensor("severe"), { entity: HEAT }, registry("Severe weather warning"));
-
-    // The tile's own Entity name is left to say it: "Severe weather warning", not "Severe Severe ...".
-    expect(tile.config?.name).toEqual(ENTITY_NAME);
-  });
-
-  it("uses the entity's own name from the registry, not the one with the location in front", async () => {
-    const { tile } = await mount(
-      sensor("severe", "Cairns Heatwave warning"),
-      { entity: HEAT },
-      registry("Heatwave warning"),
-    );
-
-    expect(tile.config?.name).toBe("Severe Heatwave warning");
-  });
-
-  it("falls back to the friendly name when the registry has none", async () => {
-    const { tile } = await mount(sensor("severe", "Cairns Heatwave warning"), { entity: HEAT });
-
-    expect(tile.config?.name).toBe("Severe Cairns Heatwave warning");
-  });
-
-  it("shows the entity's name alone when the sensor has no name to build on", async () => {
-    const { tile } = await mount(sensor("severe"), { entity: HEAT });
-
-    expect(tile.config?.name).toEqual(ENTITY_NAME);
-  });
-
-  it.each(["none", "unavailable", "unknown", "Strong Wind Warning for Sydney Coast"])(
-    "adds nothing for the state %j, which is not a level",
+  it.each(["none", "unavailable", "unknown"])(
+    "adds nothing for the state %j, when the sensor sends no title",
     async (state) => {
-      const { tile } = await mount(sensor(state), { entity: HEAT }, registry("Heatwave warning"));
+      const { tile } = await mount(sensor(state, { title: null }), { entity: HEAT });
 
       expect(tile.config?.name).toEqual(ENTITY_NAME);
     },
   );
 
   it("keeps a name set in the editor", async () => {
-    const { tile } = await mount(
-      sensor("severe"),
-      { entity: HEAT, name: "Heat" },
-      registry("Heatwave warning"),
-    );
+    const { tile } = await mount(sensor("severe", { title: "Severe Heatwave warning" }), {
+      entity: HEAT,
+      name: "Heat",
+    });
 
     expect(tile.config?.name).toBe("Heat");
   });
 
-  it("follows the sensor as its level changes, and drops the level when the warning ends", async () => {
-    const hass = registry("Heatwave warning");
-    const { card, tile } = await mount(sensor("moderate"), { entity: HEAT }, hass);
+  it("follows the sensor as the title changes, and drops it when the warning ends", async () => {
+    const { card, tile } = await mount(sensor("moderate", { title: "Moderate Heatwave warning" }), {
+      entity: HEAT,
+    });
     expect(tile.config?.name).toBe("Moderate Heatwave warning");
 
-    card.hass = { states: sensor("extreme"), ...hass };
+    card.hass = { states: sensor("extreme", { title: "Extreme Heatwave warning" }) };
     await vi.waitFor(() => expect(tile.config?.name).toBe("Extreme Heatwave warning"));
 
-    card.hass = { states: sensor("none"), ...hass };
+    card.hass = { states: sensor("none", { title: null }) };
     await vi.waitFor(() => expect(tile.config?.name).toEqual(ENTITY_NAME));
   });
 });
@@ -283,11 +246,10 @@ describe("the tile's default name and content", () => {
     expect(tile.config?.name).toEqual(ENTITY_NAME);
   });
 
-  it("still puts the level in front when the name is the Entity default", async () => {
+  it("still shows the title when the name is the Entity default", async () => {
     const { tile } = await mount(
-      typeSensor("severe"),
+      typeSensor("severe", { title: "Severe Heatwave warning" }),
       { entity: HEAT, name: ENTITY_NAME },
-      { entities: { [HEAT]: { entity_id: HEAT, name: "Heatwave warning" } } },
     );
 
     expect(tile.config?.name).toBe("Severe Heatwave warning");
@@ -394,7 +356,12 @@ describe("how the card behaves on a dashboard", () => {
   });
 
   describe("choosing the sensor a new card starts on", () => {
-    const sensor = (state: string) => ({ state, attributes: { level: state, warnings: [] } });
+    // The integration's rank is None while there is no warning, and 2 for an unrated one.
+    const RANKS: Record<string, number> = { minor: 1, moderate: 2, unrated: 2, severe: 3, extreme: 4 };
+    const sensor = (state: string) => ({
+      state,
+      attributes: { level: state, warnings: [], rank: RANKS[state] ?? null },
+    });
     const stub = (states: Record<string, unknown>) =>
       (customElements.get("bom-warning-tile") as unknown as CardClass).getStubConfig({ states }).entity;
 

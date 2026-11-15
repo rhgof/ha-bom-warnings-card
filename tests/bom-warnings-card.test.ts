@@ -129,12 +129,14 @@ describe("what each row shows", () => {
 });
 
 describe("a level BoM does not give", () => {
-  const withLevel = (level: string, phase?: string): Scenario => {
+  // The integration sends a null level for a warning with no grade, and `ended` with the phase.
+  const without = (phase?: string): Scenario => {
     const scenario = structuredClone(SCENARIOS.thunderstorm);
-    const list = scenario[COUNT].attributes.warnings as Record<string, string>[];
-    list[0].level = level;
+    const list = scenario[COUNT].attributes.warnings as Record<string, unknown>[];
+    list[0].level = null;
     if (phase) {
       list[0].phase = phase;
+      list[0].ended = true;
     }
     return scenario;
   };
@@ -145,17 +147,23 @@ describe("a level BoM does not give", () => {
     expect(rows(card).map((r) => text(r.querySelector(".level")))).toEqual(["(severe)", "(severe)"]);
   });
 
-  it.each(["unknown", "unrated"])("says nothing of a level that is %s", async (level) => {
-    const card = await mount(withLevel(level));
+  it("says nothing of a level that is not given", async () => {
+    const card = await mount(without());
 
     expect(rows(card)[0].querySelector(".level")).toBeNull();
     expect(text(rows(card)[0].querySelector(".title"))).not.toMatch(/unknown|unrated/i);
   });
 
-  it("still shows the phase of an ended warning with an unknown level", async () => {
-    const card = await mount(withLevel("unknown", "cancelled"));
+  it("still shows the phase of an ended warning with no level", async () => {
+    const card = await mount(without("cancelled"));
 
     expect(text(rows(card)[0].querySelector(".level"))).toBe("(cancelled)");
+  });
+
+  it("dims an ended warning and only that one", async () => {
+    const card = await mount(without("final"));
+
+    expect(rows(card).map((r) => r.classList.contains("ended"))).toEqual([true, false]);
   });
 });
 

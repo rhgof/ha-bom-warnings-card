@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { styleMap } from "lit/directives/style-map.js";
-import { thunderstormView, type Locale, type ThunderstormView } from "./thunderstorm-view";
+import { detailView, type DetailView, type Locale } from "./detail-view";
 
 // Wraps Home Assistant's own tile card and sets its colour from the sensor's `color` attribute.
 // The tile gives the rest for free: tapping opens the entity's more-info (history and activity),
@@ -40,19 +40,6 @@ declare global {
     customCards?: { type: string; name: string; description: string }[];
   }
 }
-
-// A sensor's state is its level. `none` and anything else (unavailable, unknown) rank lowest.
-const LEVEL_RANK: Record<string, number> = { extreme: 4, severe: 3, moderate: 2, unrated: 2, minor: 1 };
-
-// How a level reads at the front of a tile's name. Only these states are levels: `none` and the
-// like have no warning to describe, and the Most severe sensor's state is a headline.
-const LEVEL_WORDS: Record<string, string> = {
-  minor: "Minor",
-  moderate: "Moderate",
-  unrated: "Unrated",
-  severe: "Severe",
-  extreme: "Extreme",
-};
 
 // The tile's Name field set to "Entity": the sensor's own name, without the location's name that the
 // tile puts in front of it when left alone. A single non-text item is stored as the item itself.
@@ -120,7 +107,9 @@ export class BomWarningTile extends LitElement {
         state?.attributes.level !== undefined &&
         Array.isArray(state.attributes.warnings),
     );
-    const rank = (state?: HassState) => LEVEL_RANK[state?.state ?? ""] ?? 0;
+    // The integration's rank is a number while a warning is in force and absent otherwise.
+    const rank = (state?: HassState) =>
+      typeof state?.attributes.rank === "number" ? state.attributes.rank : -1;
     const [best] = [...sensors].sort(([, a], [, b]) => rank(b) - rank(a));
     if (!best) {
       return { entity: "" };
@@ -136,16 +125,16 @@ export class BomWarningTile extends LitElement {
     this._config = config;
   }
 
-  // A current thunderstorm warning is drawn by this card, because the built-in tile can show an
-  // attribute as it is but not build "Damaging winds · Large hail" or "Update due by 3:10 pm".
-  // Every other state, and every other type, is the built-in tile.
-  private _thunderstorm(): ThunderstormView | undefined {
+  // A sensor that asks for the detail layout is drawn by this card, because the built-in tile can
+  // show an attribute as it is but not build "Damaging winds · Large hail" or "Update due by 3:10
+  // pm". Every other sensor, and every state without a warning, is the built-in tile.
+  private _detail(): DetailView | undefined {
     const entity = this._config?.entity;
-    return entity && this.hass ? thunderstormView(this.hass.states[entity], this.hass) : undefined;
+    return entity && this.hass ? detailView(this.hass.states[entity], this.hass) : undefined;
   }
 
   getCardSize(): number {
-    if (this._thunderstorm()) {
+    if (this._detail()) {
       return 3;
     }
     const size = this._tile?.getCardSize?.();
@@ -153,7 +142,7 @@ export class BomWarningTile extends LitElement {
   }
 
   getGridOptions(): Record<string, unknown> {
-    if (this._thunderstorm()) {
+    if (this._detail()) {
       return { columns: 6, min_columns: 4, rows: "auto" };
     }
     return this._tile?.getGridOptions?.() ?? DEFAULT_GRID;
@@ -176,10 +165,10 @@ export class BomWarningTile extends LitElement {
     }
   };
 
-  private _thunderstormTile(view: ThunderstormView) {
+  private _detailTile(view: DetailView) {
     const color = view.color ?? "var(--secondary-text-color)";
     return html`<ha-card
-      class="thunderstorm"
+      class="detail-tile"
       role="button"
       tabindex="0"
       @click=${this._open}
@@ -213,27 +202,16 @@ export class BomWarningTile extends LitElement {
     void this._sync();
   }
 
-  // The name with the level in front, such as "Severe Heatwave warning", so the title says how bad
-  // the warning is where the colour alone cannot. Nothing when the sensor has no level or no name
-  // to build on, and never over a name the editor set.
+  // The title the integration sends, which has the level in front ("Severe Heatwave warning") and
+  // is empty while no warning is in force. Never over a name the editor set.
   private _title(config: Config, hass: Hass): string | undefined {
-    const state = hass.states[config.entity];
-    // Only a warning sensor, which lists its warnings, has a warning level for a state. A fire
-    // danger rating has its own words, and two of them, moderate and extreme, look like levels.
-    const level = Array.isArray(state?.attributes.warnings) ? LEVEL_WORDS[state?.state ?? ""] : undefined;
-    const friendly = state?.attributes.friendly_name;
-    const name = hass.entities?.[config.entity]?.name || (typeof friendly === "string" ? friendly : "");
-    // A name that already begins with the level, such as "Severe weather warning" at `severe`, is
-    // left as it is, since the level in front would say it twice.
-    if (level && name.toLowerCase().startsWith(level.toLowerCase())) {
-      return undefined;
-    }
-    return level && name ? `${level} ${name}` : undefined;
+    const title = hass.states[config.entity]?.attributes.title;
+    return typeof title === "string" && title ? title : undefined;
   }
 
   // The tile config the card wants now. Defaults come first so anything the editor set wins: the
   // name is the entity's alone, and a warning sensor shows its headline. On top go the sensor's
-  // colour and, while a warning is active, the level in the name.
+  // colour and, while a warning is active, its title in the name.
   private _tileConfig(config: Config, hass: Hass): Record<string, unknown> {
     const state = hass.states[config.entity];
     const colour = state?.attributes.color;
@@ -281,19 +259,19 @@ export class BomWarningTile extends LitElement {
   }
 
   render() {
-    const view = this._thunderstorm();
-    return view ? this._thunderstormTile(view) : (this._tile ?? nothing);
+    const view = this._detail();
+    return view ? this._detailTile(view) : (this._tile ?? nothing);
   }
 
   static styles = css`
     :host {
       display: block;
     }
-    ha-card.thunderstorm {
+    ha-card.detail-tile {
       cursor: pointer;
       height: 100%;
     }
-    ha-card.thunderstorm:focus-visible {
+    ha-card.detail-tile:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: -2px;
     }

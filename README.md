@@ -77,7 +77,7 @@ entity: sensor.home_warning_count
 | `show_headline` | `true` | Set to `false` to leave out each warning's headline. |
 | `show_area` | `true` | Set to `false` to leave out the names of the areas each warning covers. |
 | `show_summary` | `true` | Whether the summaries are showing when the card loads. Set to `false` to start with them hidden. |
-| `show_level` | `true` | Set to `false` to leave out each warning's level and phase, for example `(moderate, final)`. An ended warning is still dimmed. A level of `unknown` or `unrated`, which says nothing, is always left out. A thunderstorm shows `(severe)`, and gets a **Detailed** or **Very dangerous** tag beside its name when it is one. |
+| `show_level` | `true` | Set to `false` to leave out each warning's level and phase, for example `(moderate, final)`. An ended warning is still dimmed. A warning with no level is always left without brackets. A thunderstorm shows `(severe)`, and the integration's badges, such as **Detailed** or **Very dangerous**, sit beside its name. |
 
 The event name and icon always show. Each option is in the card's editor too, so none of them needs
 YAML.
@@ -124,15 +124,16 @@ And on the integration's **fire danger** sensors (`sensor.<title>_fire_danger_to
 moderate, yellow for high, orange for extreme and red for catastrophic. A rating is not a warning
 level, so these titles stay plain.
 
-**A current thunderstorm warning is drawn by this card**, because Home Assistant's tile can show an
-attribute as it is but cannot build a line from several. It shows "Severe thunderstorm" (the title never
-carries a level word, since the warning is severe by name), a **Detailed** tag for a storm-cell warning and a **Very
-dangerous** tag for BoM's top tier, the hazards in words ("Damaging winds · Large hail"), the summary
+**A sensor that asks for the detail layout is drawn by this card** (today that is the thunderstorm
+sensor while it has a current warning), because Home Assistant's tile can show an attribute as it is
+but cannot build a line from several. The integration sends the title ("Severe thunderstorm warning"),
+the colour, the icon and the badges, so the card never looks at the event: a **Detailed** badge for a
+storm-cell warning and a **Very dangerous** badge for BoM's top tier. It also shows the hazards in words ("Damaging winds · Large hail"), the summary
 of the paragraph that names your area, and "Update due by 3:10 pm" in your time zone, with "+1 more
 warning" when a broad and a detailed warning are both current. Tapping opens the sensor's history.
-This needs an integration that sends the `hazards`, `detailed`, `very_dangerous`, `next_issue` and
-`current` attributes. With no thunderstorm warning, and for every other type, the tile is as below.
-The ranked list shows the same two tags beside the event.
+This needs an integration that sends the `layout`, `title`, `badges`, `hazards`, `next_issue` and
+`current` attributes. With no current warning, and for every other type, the tile is as below. The
+ranked list shows the same badges beside the event.
 
 Every other tile is Home Assistant's own, so everything a tile has is there: tapping opens the sensor's
 history and activity, and the editor has the tile's own name, icon, state content (add the
