@@ -118,7 +118,7 @@ describe("the title", () => {
     [HEAT]: { state, attributes: { warnings: [], level: state, ...attributes } },
   });
 
-  // A fire danger rating has levels of its own and no title, so it stays untitled.
+  // A fire danger rating has levels of its own. It is titled only when the sensor sends a title.
   const FIRE = "sensor.home_fire_danger_today";
   const rating = (state: string): Scenario => ({
     [FIRE]: {
@@ -128,7 +128,7 @@ describe("the title", () => {
   });
 
   it.each(["no_rating", "moderate", "high", "extreme", "catastrophic"])(
-    "leaves a fire danger rating of %s untitled, but still coloured",
+    "leaves a fire danger rating of %s untitled when it sends no title, but still coloured",
     async (state) => {
       const { tile } = await mount(rating(state), { entity: FIRE });
 
@@ -136,6 +136,22 @@ describe("the title", () => {
       expect(tile.config?.color).toBe("#FEDD3A");
     },
   );
+
+  it.each([
+    ["sensor.home_fire_danger_today", "High Fire Danger Today", "#FEDD3A"],
+    ["sensor.home_fire_danger_tomorrow", "Extreme Fire Danger Tomorrow", "#F78100"],
+  ])("names the fire danger tile %s from its title, in the rating's colour", async (entity, name, colour) => {
+    const { tile } = await mount(ACTIVE, { entity });
+
+    expect(tile.config?.name).toBe(name);
+    expect(tile.config?.color).toBe(colour);
+  });
+
+  it("gives a rating with no level the plain title", async () => {
+    const { tile } = await mount(NONE, { entity: "sensor.home_fire_danger_today" });
+
+    expect(tile.config?.name).toBe("Fire Danger Today");
+  });
 
   it.each(["Severe Heatwave warning", "Severe weather warning", "Moderate Frost warning"])(
     "names the tile %j, the title the sensor sends",

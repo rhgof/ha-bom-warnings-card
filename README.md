@@ -123,8 +123,15 @@ the headline.)
 
 And on the integration's **fire danger** sensors (`sensor.<title>_fire_danger_today` and
 `..._tomorrow`), coloured by the rating with BoM's own legend: grey for no rating, green for
-moderate, yellow for high, orange for extreme and red for catastrophic. A rating is not a warning
-level, so these titles stay plain.
+moderate, yellow for high, orange for extreme and red for catastrophic. The title is the rating and
+the day, such as "Extreme Fire Danger Today" or "Moderate Fire Danger Tomorrow" ("Fire Danger
+Today" when there is no rating to name). It says Fire Danger because the rating is a scale of its
+own: its moderate is green and its extreme orange, where a warning's are orange and purple.
+
+**Use this card, not Home Assistant's own `tile`, for any of these sensors if you want the colour.**
+A plain `type: tile` on a sensor has no colour to show, because Home Assistant gives `sensor` no state
+colour, so its icon is the theme's default (blue in the default theme) whatever the level. This card
+wraps the same tile and adds the sensor's colour and title.
 
 **A sensor that asks for the detail layout is drawn by this card** (today that is the thunderstorm
 sensor while it has a current warning), because Home Assistant's tile can show an attribute as it is
