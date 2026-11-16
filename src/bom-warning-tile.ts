@@ -249,7 +249,8 @@ export class BomWarningTile extends LitElement {
     if (!this._tile) {
       this._making ??= this._make(this._tileConfig(config, hass));
       await this._making;
-      // Forgotten whether or not it worked, so the next update tries again if it did not.
+      // Forgotten whether or not it worked, so the next update (a hass or config change) tries
+      // again if it did not.
       this._making = undefined;
     }
     const tile = this._tile;
@@ -265,19 +266,19 @@ export class BomWarningTile extends LitElement {
     tile.hass = hass;
   }
 
+  // Never rejects: it runs from `updated()` and is awaited by `getUpdateComplete`, where a
+  // rejection would be unhandled and would leave the card never finishing its update.
   private async _make(tileConfig: Record<string, unknown>): Promise<void> {
-    let helpers;
     try {
-      helpers = await window.loadCardHelpers?.();
-    } catch {
-      // Home Assistant is not ready yet. The next update tries again.
-      return;
+      const helpers = await window.loadCardHelpers?.();
+      if (!helpers) {
+        return;
+      }
+      this._tile = helpers.createCardElement(tileConfig);
+      this._last = JSON.stringify(tileConfig);
+    } catch (err) {
+      console.warn(`bom-warning-tile: could not make the tile for ${tileConfig.entity}: ${String(err)}`);
     }
-    if (!helpers) {
-      return;
-    }
-    this._last = JSON.stringify(tileConfig);
-    this._tile = helpers.createCardElement(tileConfig);
   }
 
   render() {

@@ -12,13 +12,7 @@ import {
   type Tile,
 } from "./helpers";
 
-// Node's process, which the test types do not include. Vitest runs these tests in Node.
-declare const process: {
-  on(event: "unhandledRejection", listener: (reason: unknown) => void): void;
-  off(event: "unhandledRejection", listener: (reason: unknown) => void): void;
-};
-
-const ACTIVE =SCENARIOS.active as Scenario;
+const ACTIVE = SCENARIOS.active as Scenario;
 const NONE = SCENARIOS.none as Scenario;
 
 const MARINE = "sensor.home_marine_wind_warning"; // moderate, #FB8C00
@@ -315,21 +309,11 @@ describe("the tile's default name and content", () => {
 });
 
 describe("when Home Assistant's card helpers are not there yet", () => {
-  const unhandled: unknown[] = [];
-  const collect = (reason: unknown): void => {
-    unhandled.push(reason);
-  };
-
-  beforeEach(() => {
-    unhandled.length = 0;
-    process.on("unhandledRejection", collect);
-    return () => {
-      process.off("unhandledRejection", collect);
+  const failWith = (message: string) => {
+    (window as unknown as Record<string, unknown>).loadCardHelpers = async () => {
+      throw new Error(message);
     };
-  });
-
-  // Gives an unhandled rejection the turn it needs to be reported.
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  };
 
   it("makes the tile on a later update once the helpers have loaded", async () => {
     removeCardHelpers();
@@ -344,12 +328,10 @@ describe("when Home Assistant's card helpers are not there yet", () => {
     expect(made[0].config).toMatchObject({ type: "tile", entity: MARINE });
   });
 
-  it("makes the tile on a later update when loading the helpers failed, without an unhandled rejection", async () => {
-    (window as unknown as Record<string, unknown>).loadCardHelpers = async () => {
-      throw new Error("helpers are not ready");
-    };
+  it("makes the tile on a later update when loading the helpers failed", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    failWith("helpers are not ready");
     const { card } = await mount(ACTIVE);
-    await settle();
     expect(made).toHaveLength(0);
 
     stubCardHelpers();
@@ -357,7 +339,33 @@ describe("when Home Assistant's card helpers are not there yet", () => {
     await card.updateComplete;
 
     expect(made).toHaveLength(1);
-    expect(unhandled).toEqual([]);
+  });
+
+  it("says why the tile is missing when the helpers fail, since nothing else shows it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    failWith("helpers are not ready");
+
+    await mount(ACTIVE);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("helpers are not ready"));
+  });
+
+  it("finishes updating and tries again later when making the tile throws", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    (window as unknown as Record<string, unknown>).loadCardHelpers = async () => ({
+      createCardElement: () => {
+        throw new Error("no such card");
+      },
+    });
+    const { card } = await mount(ACTIVE);
+    await expect(card.updateComplete).resolves.toBe(true);
+    expect(made).toHaveLength(0);
+
+    stubCardHelpers();
+    card.hass = makeHass(ACTIVE);
+    await card.updateComplete;
+
+    expect(made).toHaveLength(1);
   });
 });
 
