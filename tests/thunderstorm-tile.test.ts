@@ -1,68 +1,42 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
-import states from "./fixtures/states.json";
-
-type Entity = { state: string; attributes: Record<string, unknown> };
-type Scenario = Record<string, Entity>;
-const SCENARIOS = states as Record<string, Scenario>;
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  SCENARIOS,
+  makeHass,
+  mount as mountCard,
+  scenario,
+  stubCardHelpers,
+  text as textOf,
+  type Mountable,
+  type Scenario,
+} from "./helpers";
 
 const THUNDER = "sensor.home_thunderstorm_warning";
 const MARINE = "sensor.home_marine_wind_warning";
 
-interface Card extends HTMLElement {
-  setConfig(config: Record<string, unknown>): void;
-  hass: unknown;
-  updateComplete: Promise<boolean>;
+interface Card extends Mountable {
   getCardSize(): number;
   getGridOptions(): Record<string, unknown>;
 }
 
-class FakeTile extends HTMLElement {
-  setConfig(): void {}
-  getCardSize(): number {
-    return 1;
-  }
-  getGridOptions(): Record<string, unknown> {
-    return { columns: 6, rows: 1 };
-  }
-}
-
 beforeAll(async () => {
-  customElements.define("hui-tile-card", FakeTile);
-  (window as unknown as Record<string, unknown>).loadCardHelpers = async () => ({
-    createCardElement: () => document.createElement("hui-tile-card"),
-  });
+  stubCardHelpers();
   await import("../src/bom-warning-tile");
 });
 
-// Home Assistant's own settings for a user in Sydney, which the footer's time is shown in.
-const SYDNEY = { locale: { language: "en-AU" }, config: { time_zone: "Australia/Sydney" } };
+beforeEach(stubCardHelpers);
 
-async function mount(
-  scenario: string,
-  entity = THUNDER,
-  hass: Record<string, unknown> = SYDNEY,
-): Promise<Card> {
-  const card = document.createElement("bom-warning-tile") as Card;
-  card.setConfig({ type: "custom:bom-warning-tile", entity });
-  card.hass = { states: SCENARIOS[scenario], ...hass };
-  document.body.append(card);
-  await card.updateComplete;
-  await vi.waitFor(() => expect(card.shadowRoot?.children.length).toBeGreaterThan(0));
-  return card;
-}
+const mount = (states: Scenario, entity = THUNDER): Promise<Card> =>
+  mountCard<Card>("bom-warning-tile", { entity }, makeHass(states));
 
-const text = (card: Card, selector: string): string =>
-  (card.shadowRoot?.querySelector(selector)?.textContent ?? "").replace(/\s+/g, " ").trim();
+const text = (card: Card, selector: string): string => textOf(card.shadowRoot, selector);
 
-const mutated = (scenario: string, change: (attrs: Record<string, unknown>) => void): void => {
-  const copy = structuredClone(SCENARIOS[scenario]);
-  change(copy[THUNDER].attributes);
-  SCENARIOS.mutated = copy;
-};
+// A copy of the thunderstorm scenario with its sensor's attributes changed.
+const thunder = (change: (attrs: Record<string, unknown>) => void, name = "thunderstorm"): Scenario =>
+  scenario(name, (copy) => change(copy[THUNDER].attributes));
 
 describe("a current warning whose sensor asks for the detail layout", () => {
   it("is its own tile, titled with the title the sensor sends and never an unrated level", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).not.toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).toBeNull();
@@ -71,26 +45,26 @@ describe("a current warning whose sensor asks for the detail layout", () => {
   });
 
   it("says Detailed for a detailed warning, and names the hazards in words", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
     expect(text(card, ".badges")).toBe("Detailed");
     expect(text(card, ".hazards")).toBe("Damaging winds · Large hail");
   });
 
   it("shows the whole summary of the detailed warning, where the storm is heading", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
     expect(text(card, ".summary")).toMatch(/Hexham by 3:10 pm\.$/);
   });
 
   it("says when the next warning is due, in the user's own time zone", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
     expect(text(card, ".footer")).toBe("Update due by 3:10 pm · +1 more warning");
   });
 
   it("says Very dangerous for the tier, and has no more-warnings note when it is the only one", async () => {
-    const card = await mount("thunderstorm_very_dangerous");
+    const card = await mount(SCENARIOS.thunderstorm_very_dangerous as Scenario);
 
     expect(text(card, ".badges")).toBe("Very dangerous");
     expect(text(card, ".hazards")).toBe("Damaging winds · Large hail");
@@ -98,10 +72,11 @@ describe("a current warning whose sensor asks for the detail layout", () => {
   });
 
   it("takes the sensor's colour and icon", async () => {
-    mutated("thunderstorm", (a) => {
-      a.icon = "mdi:weather-lightning-rainy";
-    });
-    const card = await mount("mutated");
+    const card = await mount(
+      thunder((a) => {
+        a.icon = "mdi:weather-lightning-rainy";
+      }),
+    );
 
     const icon = card.shadowRoot?.querySelector("ha-icon");
     expect(icon?.getAttribute("style")).toContain("#FF6F00");
@@ -109,13 +84,14 @@ describe("a current warning whose sensor asks for the detail layout", () => {
   });
 
   it("is drawn for any event whose sensor asks for it, since the card never checks the event", async () => {
-    SCENARIOS.marine_detail = structuredClone(SCENARIOS.active);
-    Object.assign(SCENARIOS.marine_detail[MARINE].attributes, {
-      layout: "detail",
-      title: "Moderate Marine wind warning",
-      badges: ["Gale"],
+    const marine = scenario("active", (copy) => {
+      Object.assign(copy[MARINE].attributes, {
+        layout: "detail",
+        title: "Moderate Marine wind warning",
+        badges: ["Gale"],
+      });
     });
-    const card = await mount("marine_detail", MARINE);
+    const card = await mount(marine, MARINE);
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).not.toBeNull();
     expect(text(card, ".title")).toBe("Moderate Marine wind warning");
@@ -123,14 +99,15 @@ describe("a current warning whose sensor asks for the detail layout", () => {
   });
 
   it("leaves out each line the sensor gives nothing for", async () => {
-    mutated("thunderstorm", (a) => {
-      delete a.hazards;
-      delete a.summary;
-      delete a.next_issue;
-      a.badges = [];
-      a.current = 1;
-    });
-    const card = await mount("mutated");
+    const card = await mount(
+      thunder((a) => {
+        delete a.hazards;
+        delete a.summary;
+        delete a.next_issue;
+        a.badges = [];
+        a.current = 1;
+      }),
+    );
 
     expect(card.shadowRoot?.querySelector(".hazards")).toBeNull();
     expect(card.shadowRoot?.querySelector(".summary")).toBeNull();
@@ -139,18 +116,74 @@ describe("a current warning whose sensor asks for the detail layout", () => {
     expect(text(card, ".title")).toBe("Severe thunderstorm warning");
   });
 
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "ignores a hazard named like an Object property, %j",
+    async (name) => {
+      const card = await mount(thunder((a) => (a.hazards = [name, "wind"])));
+
+      expect(text(card, ".hazards")).toBe("Damaging winds");
+    },
+  );
+
+  it("leaves out the hazards line when every hazard is unknown", async () => {
+    const card = await mount(thunder((a) => (a.hazards = ["constructor", "tornado"])));
+
+    expect(card.shadowRoot?.querySelector(".hazards")).toBeNull();
+  });
+
+  it("falls back to the secondary text colour and a plain alert icon when the sensor sends neither", async () => {
+    const card = await mount(
+      thunder((a) => {
+        delete a.color;
+        delete a.icon;
+      }),
+    );
+    const icon = card.shadowRoot?.querySelector("ha-icon");
+
+    expect(icon?.getAttribute("icon")).toBe("mdi:alert-circle");
+    expect(icon?.getAttribute("style")).toContain("var(--secondary-text-color)");
+  });
+
+  it("shows the tile as usual when the colour is not a colour", async () => {
+    const card = await mount(thunder((a) => (a.color = "not a colour")));
+
+    expect(text(card, ".title")).toBe("Severe thunderstorm warning");
+    expect(card.shadowRoot?.querySelector(".detail-tile")).not.toBeNull();
+  });
+
+  it("leaves out the due time when next_issue is not a time, and keeps the rest of the footer", async () => {
+    const card = await mount(thunder((a) => (a.next_issue = "soon")));
+
+    expect(text(card, ".footer")).toBe("+1 more warning");
+  });
+
+  it.each(["many", null, "2x", {}, -3, 0])(
+    "has no more-warnings note when the current count is %j",
+    async (current) => {
+      const card = await mount(
+        thunder((a) => {
+          delete a.next_issue;
+          a.current = current;
+        }),
+      );
+
+      expect(card.shadowRoot?.querySelector(".footer")).toBeNull();
+    },
+  );
+
   it("says how many more warnings there are, in the plural too", async () => {
-    mutated("thunderstorm", (a) => {
-      delete a.next_issue;
-      a.current = 3;
-    });
-    const card = await mount("mutated");
+    const card = await mount(
+      thunder((a) => {
+        delete a.next_issue;
+        a.current = 3;
+      }),
+    );
 
     expect(text(card, ".footer")).toBe("+2 more warnings");
   });
 
   it("opens the entity's more-info when tapped, and from the keyboard", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
     const opened: unknown[] = [];
     card.addEventListener("hass-more-info", (e) => opened.push((e as CustomEvent).detail));
     const tile = card.shadowRoot?.querySelector<HTMLElement>(".detail-tile");
@@ -163,7 +196,7 @@ describe("a current warning whose sensor asks for the detail layout", () => {
   });
 
   it("is taller than a one-row tile", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
     expect(card.getCardSize()).toBeGreaterThan(1);
     expect(card.getGridOptions()).toMatchObject({ rows: "auto" });
@@ -172,14 +205,14 @@ describe("a current warning whose sensor asks for the detail layout", () => {
 
 describe("everything else stays the built-in tile", () => {
   it("shows the built-in tile when there is no thunderstorm warning", async () => {
-    const card = await mount("none");
+    const card = await mount(SCENARIOS.none as Scenario);
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
   it("shows the built-in tile for another type, even with a thunderstorm sensor active", async () => {
-    const card = await mount("active", MARINE);
+    const card = await mount(SCENARIOS.active as Scenario, MARINE);
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
@@ -188,7 +221,7 @@ describe("everything else stays the built-in tile", () => {
   it("shows the built-in tile for the Most severe sensor, which repeats its top warning's fields", async () => {
     const [top] = SCENARIOS.thunderstorm["sensor.home_warning_count"].attributes
       .warnings as Record<string, unknown>[];
-    SCENARIOS.most_severe = {
+    const mostSevere: Scenario = {
       "sensor.home_most_severe_warning": {
         // Its state is a level, and its attributes are the top warning's, event included, but it
         // never sends `layout`.
@@ -197,16 +230,16 @@ describe("everything else stays the built-in tile", () => {
       },
     };
 
-    const card = await mount("most_severe", "sensor.home_most_severe_warning");
+    const card = await mount(mostSevere, "sensor.home_most_severe_warning");
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
     expect(card.shadowRoot?.querySelector("hui-tile-card")).not.toBeNull();
   });
 
   it("goes back to the built-in tile when the warning ends", async () => {
-    const card = await mount("thunderstorm");
+    const card = await mount(SCENARIOS.thunderstorm as Scenario);
 
-    card.hass = { states: SCENARIOS.none, ...SYDNEY };
+    card.hass = makeHass(SCENARIOS.none as Scenario);
     await card.updateComplete;
 
     expect(card.shadowRoot?.querySelector(".detail-tile")).toBeNull();
