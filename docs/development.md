@@ -9,7 +9,7 @@
 | `src/bom-warnings-card-editor.ts` | The visual editor for that card. |
 | `src/bom-warning-tile.ts` | The tile, `custom:bom-warning-tile`. Wraps Home Assistant's own tile card and sets its colour from the sensor's `color` attribute. While a sensor sends `layout: "detail"` it draws its own tile instead. |
 | `src/detail-view.ts` | Pure: what that tile shows (title, badges, hazards, summary, "Update due by"), worked out from the sensor's attributes. |
-| `tests/` | Vitest tests, one file per source file, plus `bundle.test.ts` for the built file. |
+| `tests/` | Vitest tests, one file per source file, plus `index.test.ts` for the entry point. `helpers.ts` has the shared stand-ins, `mount` and frozen fixtures, and `setup.ts` removes what each test added. |
 | `tests/fixtures/states.json` | A copy of the integration's `tests/fixtures/dashboard/states.json`. See below. |
 | `dist/bom-warnings-card.js` | The built bundle. HACS serves this committed file. |
 

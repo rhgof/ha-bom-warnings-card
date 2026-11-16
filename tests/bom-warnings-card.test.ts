@@ -1,31 +1,18 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import states from "./fixtures/states.json";
+import { SCENARIOS as FIXTURE, makeHass, mount as mountCard, text, type Mountable, type Scenario } from "./helpers";
 
-type Entity = { state: string; attributes: Record<string, unknown> };
-type Scenario = Record<string, Entity>;
-const SCENARIOS = states as Record<string, Scenario>;
+const SCENARIOS = FIXTURE as Record<string, Scenario>;
 const COUNT = "sensor.home_warning_count";
 
-interface Card extends HTMLElement {
-  setConfig(config: Record<string, unknown>): void;
-  hass: unknown;
-  updateComplete: Promise<boolean>;
-}
+type Card = Mountable;
 
 beforeAll(async () => {
   await import("../src/bom-warnings-card");
 });
 
-async function mount(scenario: Scenario, config: Record<string, unknown> = {}): Promise<Card> {
-  const card = document.createElement("bom-warnings-card") as Card;
-  card.setConfig({ type: "custom:bom-warnings-card", entity: COUNT, ...config });
-  card.hass = { states: scenario };
-  document.body.append(card);
-  await card.updateComplete;
-  return card;
-}
+const mount = (scenario: Scenario, config: Record<string, unknown> = {}): Promise<Card> =>
+  mountCard<Card>("bom-warnings-card", { entity: COUNT, ...config }, makeHass(scenario));
 
-const text = (el: Node | null | undefined) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
 const rows = (card: Card) => [...card.shadowRoot!.querySelectorAll(".warning")];
 const colour = (value: string) => {
   const probe = document.createElement("div");
@@ -49,9 +36,14 @@ describe("the ranked list", () => {
 
     expect(rows(card)).toHaveLength(warnings("active").length);
     rows(card).forEach((row, i) => {
+      const { icon: expectedIcon, color: expectedColour } = warnings("active")[i];
+      // A fixture row with no colour or icon would make this test pass on nothing.
+      expect(expectedIcon, `fixture icon of row ${i}`).toMatch(/^mdi:/);
+      expect(colour(expectedColour), `fixture colour of row ${i}`).not.toBe("");
+
       const icon = row.querySelector("ha-icon") as HTMLElement;
-      expect(icon.getAttribute("icon")).toBe(warnings("active")[i].icon);
-      expect(icon.style.color).toBe(colour(warnings("active")[i].color));
+      expect(icon.getAttribute("icon")).toBe(expectedIcon);
+      expect(icon.style.color).toBe(colour(expectedColour));
     });
   });
 
@@ -83,13 +75,16 @@ describe("the ranked list", () => {
     expect(off.shadowRoot!.querySelector(".summary")).toBeNull();
   });
 
-  it("copes with a warning that has no colour or icon", async () => {
+  it("copes with a warning that has no colour or icon, and falls back to a plain alert in the secondary text colour", async () => {
     const bare: Scenario = {
       [COUNT]: { state: "1", attributes: { warnings: [{ event: "Wind", headline: "h", level: "x", phase: "update" }] } },
     };
     const card = await mount(bare);
+    const icon = rows(card)[0].querySelector("ha-icon") as HTMLElement;
 
     expect(text(rows(card)[0].querySelector(".event"))).toBe("Wind");
+    expect(icon.getAttribute("icon")).toBe("mdi:alert");
+    expect(icon.style.color).toBe(colour("var(--secondary-text-color)"));
   });
 });
 

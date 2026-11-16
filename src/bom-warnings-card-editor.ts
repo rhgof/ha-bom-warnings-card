@@ -62,8 +62,14 @@ export class BomWarningsCardEditor extends LitElement {
 
   _changed(event: CustomEvent<{ value: Partial<Config> }>): void {
     const value = event.detail.value;
-    // Defaults are left out, so the saved config shows only what the person chose.
+    // Keys this editor has no field for, such as the dashboard's visibility, are kept. Defaults
+    // are left out, so the saved config shows only what the person chose.
+    const rest: Record<string, unknown> = { ...this._config };
+    for (const name of ["entity", "title", ...SHOW]) {
+      delete rest[name];
+    }
     const config: Config = {
+      ...rest,
       type: this._config?.type ?? "custom:bom-warnings-card",
       ...(value.entity ? { entity: value.entity } : {}),
       ...(value.title ? { title: value.title } : {}),

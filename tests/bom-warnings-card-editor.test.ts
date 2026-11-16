@@ -1,10 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { mount as mountCard, type Mountable } from "./helpers";
 
-interface Editor extends HTMLElement {
-  setConfig(config: Record<string, unknown>): void;
-  hass: unknown;
-  updateComplete: Promise<boolean>;
-}
+type Editor = Mountable;
 
 interface CardClass {
   getConfigElement(): HTMLElement;
@@ -28,14 +25,8 @@ beforeAll(async () => {
   await import("../src/bom-warnings-card");
 });
 
-async function mount(config: Record<string, unknown> = {}): Promise<Editor> {
-  const editor = document.createElement("bom-warnings-card-editor") as Editor;
-  editor.setConfig({ type: "custom:bom-warnings-card", ...config });
-  editor.hass = hass;
-  document.body.append(editor);
-  await editor.updateComplete;
-  return editor;
-}
+const mount = (config: Record<string, unknown> = {}): Promise<Editor> =>
+  mountCard<Editor>("bom-warnings-card-editor", { type: "custom:bom-warnings-card", ...config }, hass);
 
 const form = (editor: Editor) =>
   editor.shadowRoot!.querySelector("ha-form") as HTMLElement & {
@@ -137,6 +128,19 @@ describe("the card's editor", () => {
     const [config] = change(editor, { entity: "sensor.home_warning_count", title: "", show_summary: true });
 
     expect(config).toEqual({ type: "custom:bom-warnings-card", entity: "sensor.home_warning_count" });
+  });
+
+  it("keeps the config keys it does not know, such as the dashboard's visibility and grid options", async () => {
+    const extra = { visibility: [{ condition: "state" }], grid_options: { columns: 12 } };
+    const editor = await mount({ entity: "sensor.home_warning_count", show_area: false, ...extra });
+
+    const [config] = change(editor, { entity: "sensor.cairns_warning_count", show_area: true });
+
+    expect(config).toEqual({
+      type: "custom:bom-warnings-card",
+      entity: "sensor.cairns_warning_count",
+      ...extra,
+    });
   });
 
   it.each(["show_headline", "show_area", "show_summary", "show_level"])(

@@ -1,29 +1,17 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import states from "./fixtures/states.json";
+import { SCENARIOS as FIXTURE, makeHass, mount as mountCard, type Mountable, type Scenario } from "./helpers";
 
-type Entity = { state: string; attributes: Record<string, unknown> };
-type Scenario = Record<string, Entity>;
-const SCENARIOS = states as Record<string, Scenario>;
+const SCENARIOS = FIXTURE as Record<string, Scenario>;
 const COUNT = "sensor.home_warning_count";
 
-interface Card extends HTMLElement {
-  setConfig(config: Record<string, unknown>): void;
-  hass: unknown;
-  updateComplete: Promise<boolean>;
-}
+type Card = Mountable;
 
 beforeAll(async () => {
   await import("../src/bom-warnings-card");
 });
 
-async function mount(scenario: Scenario, config: Record<string, unknown> = {}): Promise<Card> {
-  const card = document.createElement("bom-warnings-card") as Card;
-  card.setConfig({ type: "custom:bom-warnings-card", entity: COUNT, ...config });
-  card.hass = { states: scenario };
-  document.body.append(card);
-  await card.updateComplete;
-  return card;
-}
+const mount = (scenario: Scenario, config: Record<string, unknown> = {}): Promise<Card> =>
+  mountCard<Card>("bom-warnings-card", { entity: COUNT, ...config }, makeHass(scenario));
 
 const haCard = (card: Card) => card.shadowRoot!.querySelector("ha-card") as HTMLElement;
 const summaries = (card: Card) => card.shadowRoot!.querySelectorAll(".summary").length;
@@ -81,7 +69,7 @@ describe("tapping the card to show or hide the summaries", () => {
     const card = await mount(SCENARIOS.active);
     await tap(card);
 
-    card.hass = { states: { ...SCENARIOS.active } };
+    card.hass = makeHass({ ...SCENARIOS.active });
     await card.updateComplete;
 
     expect(summaries(card)).toBe(0);
@@ -118,10 +106,10 @@ describe("tapping the card to show or hide the summaries", () => {
     expect(summaries(card)).toBe(withSummary(SCENARIOS.active));
   });
 
-  it("no longer asks Home Assistant to do anything on a tap", async () => {
+  it("only shows or hides the summaries, and does not open more-info", async () => {
     const card = await mount(SCENARIOS.active);
-    const seen: Event[] = [];
-    document.addEventListener("hass-action", (e) => seen.push(e));
+    const seen: string[] = [];
+    card.addEventListener("hass-more-info", () => seen.push("hass-more-info"));
 
     await tap(card);
 

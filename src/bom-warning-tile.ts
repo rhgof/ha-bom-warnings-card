@@ -87,7 +87,11 @@ export class BomWarningTile extends LitElement {
   // not know, so this card has no options of its own.
   static async getConfigElement(): Promise<HTMLElement> {
     const helpers = await window.loadCardHelpers?.();
-    helpers?.createCardElement({ type: "tile", entity: "sensor.x" });
+    if (!helpers) {
+      // Without the helpers nothing defines the tile card, and waiting for it would never end.
+      throw new Error("Home Assistant's card helpers are not available");
+    }
+    helpers.createCardElement({ type: "tile", entity: "sensor.x" });
     await customElements.whenDefined("hui-tile-card");
     const tile = customElements.get("hui-tile-card") as unknown as {
       getConfigElement(): Promise<HTMLElement>;
@@ -201,6 +205,17 @@ export class BomWarningTile extends LitElement {
     void this._sync();
   }
 
+  // The tile is made after the first render, so the card is only done updating once that has
+  // finished and the render that shows the tile has run. Tests and callers wait on this.
+  protected override async getUpdateComplete(): Promise<boolean> {
+    const settled = await super.getUpdateComplete();
+    if (!this._making) {
+      return settled;
+    }
+    await this._making;
+    return super.getUpdateComplete();
+  }
+
   // The title the integration sends, which has the level in front ("Severe Heatwave warning") and
   // is empty while no warning is in force. Never over a name the editor set.
   private _title(config: Config, hass: Hass): string | undefined {
@@ -234,6 +249,8 @@ export class BomWarningTile extends LitElement {
     if (!this._tile) {
       this._making ??= this._make(this._tileConfig(config, hass));
       await this._making;
+      // Forgotten whether or not it worked, so the next update tries again if it did not.
+      this._making = undefined;
     }
     const tile = this._tile;
     if (!tile) {
@@ -249,7 +266,13 @@ export class BomWarningTile extends LitElement {
   }
 
   private async _make(tileConfig: Record<string, unknown>): Promise<void> {
-    const helpers = await window.loadCardHelpers?.();
+    let helpers;
+    try {
+      helpers = await window.loadCardHelpers?.();
+    } catch {
+      // Home Assistant is not ready yet. The next update tries again.
+      return;
+    }
     if (!helpers) {
       return;
     }

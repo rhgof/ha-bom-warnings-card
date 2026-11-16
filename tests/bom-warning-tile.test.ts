@@ -1,10 +1,25 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import states from "./fixtures/states.json";
+import {
+  EDITOR,
+  SCENARIOS,
+  made,
+  makeHass,
+  removeCardHelpers,
+  mount as mountCard,
+  stubCardHelpers,
+  type Mountable,
+  type Scenario,
+  type Tile,
+} from "./helpers";
 
-type Entity = { state: string; attributes: Record<string, unknown> };
-type Scenario = Record<string, Entity>;
-const ACTIVE = (states as Record<string, Scenario>).active;
-const NONE = (states as Record<string, Scenario>).none;
+// Node's process, which the test types do not include. Vitest runs these tests in Node.
+declare const process: {
+  on(event: "unhandledRejection", listener: (reason: unknown) => void): void;
+  off(event: "unhandledRejection", listener: (reason: unknown) => void): void;
+};
+
+const ACTIVE =SCENARIOS.active as Scenario;
+const NONE = SCENARIOS.none as Scenario;
 
 const MARINE = "sensor.home_marine_wind_warning"; // moderate, #FB8C00
 const HEAT = "sensor.home_extreme_heat_warning"; // severe, #D32F2F
@@ -13,16 +28,7 @@ const THUNDER = "sensor.home_thunderstorm_warning"; // none, no colour
 // The tile's Name field set to Entity only, so the location's name is not in front of it.
 const ENTITY_NAME = { type: "entity" };
 
-interface Tile extends HTMLElement {
-  config?: Record<string, unknown>;
-  hass?: unknown;
-  setConfig(config: Record<string, unknown>): void;
-}
-
-interface Card extends HTMLElement {
-  setConfig(config: Record<string, unknown>): void;
-  hass: unknown;
-  updateComplete: Promise<boolean>;
+interface Card extends Mountable {
   getCardSize(): number;
   getGridOptions(): Record<string, unknown>;
 }
@@ -32,58 +38,23 @@ interface CardClass {
   getStubConfig(hass: unknown): Record<string, unknown>;
 }
 
-// What Home Assistant provides: a tile card, and a way to make one. A stand-in records what the
-// card does to it.
-const made: Tile[] = [];
-const EDITOR = document.createElement("div");
-
-class FakeTile extends HTMLElement {
-  config?: Record<string, unknown>;
-  hass?: unknown;
-  setConfig(config: Record<string, unknown>): void {
-    this.config = config;
-  }
-  getCardSize(): number {
-    return 1;
-  }
-  getGridOptions(): Record<string, unknown> {
-    return { columns: 6, rows: 1 };
-  }
-  static async getConfigElement(): Promise<HTMLElement> {
-    return EDITOR;
-  }
-}
-
 beforeAll(async () => {
-  customElements.define("hui-tile-card", FakeTile);
-  (window as unknown as Record<string, unknown>).loadCardHelpers = async () => ({
-    createCardElement: (config: Record<string, unknown>) => {
-      const tile = document.createElement("hui-tile-card") as Tile;
-      tile.setConfig(config);
-      made.push(tile);
-      return tile;
-    },
-  });
+  stubCardHelpers();
   await import("../src/bom-warning-tile");
 });
 
-beforeEach(() => {
-  made.length = 0;
-});
+beforeEach(stubCardHelpers);
 
 async function mount(
   scenario: Scenario,
   config: Record<string, unknown> = {},
-  hass: Record<string, unknown> = {},
 ): Promise<{ card: Card; tile: Tile }> {
-  const card = document.createElement("bom-warning-tile") as Card;
-  card.setConfig({ type: "custom:bom-warning-tile", entity: MARINE, ...config });
-  card.hass = { states: scenario, ...hass };
-  document.body.append(card);
-  await vi.waitFor(() => expect(made.length).toBeGreaterThan(0));
-  const tile = made[made.length - 1];
-  await card.updateComplete;
-  return { card, tile };
+  const card = await mountCard<Card>(
+    "bom-warning-tile",
+    { entity: MARINE, ...config },
+    makeHass(scenario),
+  );
+  return { card, tile: made[made.length - 1] };
 }
 
 describe("the wrapped tile", () => {
@@ -186,11 +157,13 @@ describe("the title", () => {
     });
     expect(tile.config?.name).toBe("Moderate Heatwave warning");
 
-    card.hass = { states: sensor("extreme", { title: "Extreme Heatwave warning" }) };
-    await vi.waitFor(() => expect(tile.config?.name).toBe("Extreme Heatwave warning"));
+    card.hass = makeHass(sensor("extreme", { title: "Extreme Heatwave warning" }));
+    await card.updateComplete;
+    expect(tile.config?.name).toBe("Extreme Heatwave warning");
 
-    card.hass = { states: sensor("none", { title: null }) };
-    await vi.waitFor(() => expect(tile.config?.name).toEqual(ENTITY_NAME));
+    card.hass = makeHass(sensor("none", { title: null }));
+    await card.updateComplete;
+    expect(tile.config?.name).toEqual(ENTITY_NAME);
   });
 });
 
@@ -226,19 +199,23 @@ describe("the severity colour", () => {
     const { card, tile } = await mount(NONE, { entity: MARINE });
     expect(tile.config).not.toHaveProperty("color");
 
-    card.hass = { states: ACTIVE };
-    await vi.waitFor(() => expect(tile.config?.color).toBe("#FB8C00"));
+    card.hass = makeHass(ACTIVE);
+    await card.updateComplete;
+    expect(tile.config?.color).toBe("#FB8C00");
   });
 
-  it("does not reconfigure the tile when nothing about it changed", async () => {
+  it("does not reconfigure the tile when nothing about it changed, but still hands it the new hass", async () => {
     const { card, tile } = await mount(ACTIVE);
     const spy = vi.spyOn(tile, "setConfig");
+    const next = makeHass({ ...ACTIVE });
 
-    card.hass = { states: { ...ACTIVE } };
-    card.hass = { states: { ...ACTIVE } };
+    card.hass = makeHass({ ...ACTIVE });
+    await card.updateComplete;
+    card.hass = next;
     await card.updateComplete;
 
     expect(spy).not.toHaveBeenCalled();
+    expect(tile.hass).toBe(next);
   });
 
   it("still makes the tile when the entity is missing, and gives it no colour", async () => {
@@ -334,6 +311,53 @@ describe("the tile's default name and content", () => {
       name: ENTITY_NAME,
       state_content: ["state", "headline"],
     });
+  });
+});
+
+describe("when Home Assistant's card helpers are not there yet", () => {
+  const unhandled: unknown[] = [];
+  const collect = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+
+  beforeEach(() => {
+    unhandled.length = 0;
+    process.on("unhandledRejection", collect);
+    return () => {
+      process.off("unhandledRejection", collect);
+    };
+  });
+
+  // Gives an unhandled rejection the turn it needs to be reported.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("makes the tile on a later update once the helpers have loaded", async () => {
+    removeCardHelpers();
+    const { card } = await mount(ACTIVE);
+    expect(made).toHaveLength(0);
+
+    stubCardHelpers();
+    card.hass = makeHass(ACTIVE);
+    await card.updateComplete;
+
+    expect(made).toHaveLength(1);
+    expect(made[0].config).toMatchObject({ type: "tile", entity: MARINE });
+  });
+
+  it("makes the tile on a later update when loading the helpers failed, without an unhandled rejection", async () => {
+    (window as unknown as Record<string, unknown>).loadCardHelpers = async () => {
+      throw new Error("helpers are not ready");
+    };
+    const { card } = await mount(ACTIVE);
+    await settle();
+    expect(made).toHaveLength(0);
+
+    stubCardHelpers();
+    card.hass = makeHass(ACTIVE);
+    await card.updateComplete;
+
+    expect(made).toHaveLength(1);
+    expect(unhandled).toEqual([]);
   });
 });
 

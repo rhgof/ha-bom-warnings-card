@@ -42,7 +42,8 @@ function hazardsLine(value: unknown): string | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  const words = value.map((h) => HAZARD_WORDS[String(h)]).filter(Boolean);
+  // Own keys only: a hazard called "constructor" must not find Object's.
+  const words = value.flatMap((h) => (Object.hasOwn(HAZARD_WORDS, String(h)) ? [HAZARD_WORDS[String(h)]] : []));
   return words.length ? words.join(" · ") : undefined;
 }
 
